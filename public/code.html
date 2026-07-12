@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Xense Energy Intelligence Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-background": "#d3e4fe",
+                        "primary-fixed": "#6bff8f",
+                        "surface-container-high": "#1b2b3f",
+                        "tertiary": "#ffba61",
+                        "on-tertiary-fixed": "#2a1700",
+                        "surface-bright": "#2a3a4f",
+                        "on-surface": "#d3e4fe",
+                        "inverse-primary": "#006e2f",
+                        "surface": "#031427",
+                        "primary-container": "#22c55e",
+                        "secondary-container": "#0566d9",
+                        "background": "#031427",
+                        "tertiary-fixed": "#ffddb8",
+                        "primary-fixed-dim": "#4ae176",
+                        "on-error-container": "#ffdad6",
+                        "surface-variant": "#26364a",
+                        "on-secondary-fixed": "#001a42",
+                        "surface-container-lowest": "#000f21",
+                        "on-secondary-fixed-variant": "#004395",
+                        "inverse-on-surface": "#213145",
+                        "secondary-fixed": "#d8e2ff",
+                        "surface-dim": "#031427",
+                        "primary": "#4be277",
+                        "on-secondary": "#002e6a",
+                        "on-tertiary": "#472a00",
+                        "on-primary-container": "#004b1e",
+                        "secondary-fixed-dim": "#adc6ff",
+                        "on-tertiary-container": "#5c3800",
+                        "tertiary-container": "#ef9900",
+                        "outline-variant": "#3d4a3d",
+                        "error-container": "#93000a",
+                        "surface-container-highest": "#26364a",
+                        "on-surface-variant": "#bccbb9",
+                        "on-tertiary-fixed-variant": "#653e00",
+                        "secondary": "#adc6ff",
+                        "tertiary-fixed-dim": "#ffb95f",
+                        "error": "#ffb4ab",
+                        "outline": "#869585",
+                        "surface-container-low": "#0b1c30",
+                        "inverse-surface": "#d3e4fe",
+                        "surface-tint": "#4ae176",
+                        "on-secondary-container": "#e6ecff",
+                        "on-primary-fixed-variant": "#005321",
+                        "on-primary-fixed": "#002109",
+                        "on-primary": "#003915",
+                        "surface-container": "#102034",
+                        "on-error": "#690005",
+                        "blue-500": "#3B82F6",
+                        "red-500": "#EF4444",
+                        "amber-500": "#F59E0B"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "inner-padding": "20px",
+                        "stack-gap": "16px",
+                        "container-padding": "24px",
+                        "grid-gutter": "20px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Inter"],
+                        "label-caps": ["Inter"],
+                        "metric-lg-mobile": ["Inter"],
+                        "body-md": ["Inter"],
+                        "metric-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["18px", {"lineHeight": "24px", "fontWeight": "600"}],
+                        "label-caps": ["11px", {"lineHeight": "16px", "letterSpacing": "0.08em", "fontWeight": "600", "textTransform": "uppercase"}],
+                        "metric-lg-mobile": ["28px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "metric-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #0F172A; }
+        .card-surface { background-color: #1E293B; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05); }
+        .text-muted { color: #64748B; }
+        .bg-green-soft { background-color: rgba(34, 197, 94, 0.1); }
+        .bg-blue-soft { background-color: rgba(59, 130, 246, 0.1); }
+        .bg-red-soft { background-color: rgba(239, 68, 68, 0.1); }
+        .bg-amber-soft { background-color: rgba(245, 158, 11, 0.1); }
+        .border-subtle { border-color: #334155; }
+        .gauge-track { stroke: #334155; fill: none; stroke-width: 12; stroke-linecap: round; }
+        .gauge-fill { stroke: #22C55E; fill: none; stroke-width: 12; stroke-linecap: round; stroke-dasharray: 251.2; stroke-dashoffset: 70.3; /* 72% of 251.2 */ transition: stroke-dashoffset 1s ease-in-out; }
+    </style>
+</head>
+<body class="text-on-background font-body-md min-h-screen pb-12 flex flex-col items-center">
+<!-- Notification Banner -->
+<div class="w-full bg-blue-500 text-white text-center py-2 font-headline-md text-sm z-50 relative shadow-md">
+<span class="material-symbols-outlined align-middle mr-1 text-[18px]">info</span> Mode Changed to Xense Mode
+    </div>
+<!-- Container -->
+<div class="w-full max-w-[1280px] px-container-padding flex-1 mt-4 space-y-grid-gutter">
+<!-- TopNavBar Component Translation -->
+<nav class="card-surface rounded-xl flex justify-between items-center px-container-padding h-16 w-full shadow-sm mb-6 sticky top-4 z-40">
+<!-- Left: Brand -->
+<div class="flex items-center space-x-3">
+<span class="material-symbols-outlined text-primary text-3xl">bolt</span>
+<div class="flex flex-col">
+<span class="font-headline-md text-headline-md font-bold text-on-surface">Xense Energy</span>
+<span class="font-label-caps text-label-caps text-primary/70">solar-intelligent load control</span>
+</div>
+</div>
+<!-- Center: Status -->
+<div class="flex items-center space-x-4 bg-surface-container-high px-4 py-2 rounded-full border border-subtle">
+<div class="flex items-center space-x-2">
+<span class="w-2.5 h-2.5 rounded-full bg-primary animate-pulse"></span>
+<span class="font-headline-md text-sm text-on-surface">Living Room Plug</span>
+</div>
+<div class="h-4 w-px bg-surface-variant"></div>
+<div class="flex items-center space-x-1 text-blue-500">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">wifi</span>
+<span class="font-label-caps text-label-caps text-on-surface-variant ml-1">Online</span>
+</div>
+</div>
+<!-- Right: Actions -->
+<div class="flex items-center space-x-4">
+<button class="text-on-surface-variant hover:text-blue-500 transition-colors p-2 rounded-full hover:bg-surface-variant">
+<span class="material-symbols-outlined">language</span>
+</button>
+<button class="relative text-on-surface-variant hover:text-on-surface transition-colors p-2 rounded-full hover:bg-surface-variant">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500"></span>
+</button>
+<div class="w-9 h-9 rounded-full bg-surface-variant flex items-center justify-center font-headline-md text-sm border border-subtle ml-2 overflow-hidden">
+<img alt="User profile" class="object-cover w-full h-full" data-alt="A macro shot of a sleek, dark metallic user avatar placeholder reading 'AD' in minimalist white sans-serif typography, glowing subtly against a deep slate background. The lighting is moody and cinematic, reflecting a high-tech, premium dark mode user interface aesthetic. The texture feels like brushed aluminum." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC2zTWOwd2hWhtaKT8W1TfZ-tkc2UVaMhYw2whrmvE3kHoSATNypyyCvgztB6nroGuBgL_3uWnLj3DlhzklCrOKLxnbPZkCEXDsDkIvsW43NMj4q2hwCXUUQbnkWhFmpImU_AZM7yRNBKBS_VnMiQcL6OQ5nhLzs_gWw5Q7_MAx56MlW5BFPXWsh06v7m9OL3MzaGsanWL22ESZ3NvscmN7ANi6q78LmenBkNsJhOpm1F3KJvgTwGy-JqkOb8xM_fUxdDSW0_ag-gk"/>
+</div>
+</div>
+</nav>
+<!-- Main Grid Layout -->
+<main class="grid grid-cols-12 gap-grid-gutter w-full">
+<!-- ROW 1 HERO -->
+<!-- Left (40% - roughly 5 cols) -->
+<div class="col-span-12 md:col-span-5 card-surface rounded-xl p-inner-padding flex flex-col justify-between">
+<div class="flex justify-between items-start mb-4">
+<h2 class="font-label-caps text-label-caps text-muted">Battery Status</h2>
+<div class="bg-green-soft text-primary px-2 py-1 rounded-full font-label-caps text-[10px] flex items-center">
+<span class="w-1.5 h-1.5 rounded-full bg-primary mr-1.5"></span>
+                        Online
+                    </div>
+</div>
+<div class="flex items-center space-x-6">
+<div class="relative w-32 h-32 flex-shrink-0">
+<svg class="w-full h-full transform -rotate-90" viewbox="0 0 100 100">
+<circle class="gauge-track" cx="50" cy="50" r="40"></circle>
+<circle class="gauge-fill" cx="50" cy="50" r="40"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="font-metric-lg text-metric-lg text-on-surface">72%</span>
+<span class="font-body-md text-muted">48.2V</span>
+</div>
+</div>
+<div class="flex flex-col space-y-3 flex-1">
+<div class="bg-surface-container-high rounded-lg p-3 border border-subtle">
+<div class="flex items-center mb-1">
+<span class="material-symbols-outlined text-primary text-sm mr-2" style="font-variation-settings: 'FILL' 1;">power</span>
+<span class="font-headline-md text-sm">Relay Closed</span>
+</div>
+<span class="font-body-md text-muted text-xs block">Device is actively powered.</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Center (35% - roughly 4 cols) -->
+<div class="col-span-12 md:col-span-4 card-surface rounded-xl p-inner-padding flex flex-col justify-between">
+<div class="flex justify-between items-start mb-4">
+<h2 class="font-label-caps text-label-caps text-muted">Solar Production</h2>
+<div class="flex items-center text-blue-500 bg-blue-soft px-2 py-1 rounded-full font-label-caps text-[10px]">
+<span class="material-symbols-outlined text-[12px] mr-1">cloud_sync</span>
+                        Synced 2s ago
+                    </div>
+</div>
+<div class="flex flex-col items-center justify-center flex-1 py-4">
+<span class="material-symbols-outlined text-amber-500 text-5xl mb-2" style="font-variation-settings: 'FILL' 1;">light_mode</span>
+<span class="font-metric-lg text-metric-lg text-on-surface">1,842 W</span>
+</div>
+<div class="mt-auto bg-green-soft text-primary px-3 py-2 rounded-lg flex items-center justify-center border border-primary/20">
+<span class="material-symbols-outlined text-sm mr-2">grid_on</span>
+<span class="font-headline-md text-sm">Grid Available</span>
+</div>
+</div>
+<!-- Right (25% - roughly 3 cols) -->
+<div class="col-span-12 md:col-span-3 card-surface rounded-xl p-inner-padding flex flex-col">
+<div class="flex justify-between items-center mb-4 pb-2 border-b border-subtle">
+<div class="flex items-center text-blue-500">
+<span class="material-symbols-outlined mr-2">power_input</span>
+<h2 class="font-label-caps text-label-caps text-muted m-0">Total Load</h2>
+</div>
+<span class="font-headline-md text-lg text-on-surface">650 W</span>
+</div>
+<h3 class="font-label-caps text-[10px] text-muted mb-3">Priority List</h3>
+<div class="space-y-2 flex-1 overflow-y-auto pr-1 custom-scrollbar">
+<div class="flex justify-between items-center bg-surface-container-high p-2 rounded text-sm border border-subtle">
+<span class="text-on-surface flex items-center"><span class="text-muted w-4 mr-1 text-xs">#1</span> Fridge</span>
+<span class="text-primary font-bold text-xs bg-green-soft px-1.5 py-0.5 rounded">ON</span>
+</div>
+<div class="flex justify-between items-center bg-surface-container-high p-2 rounded text-sm border border-subtle">
+<span class="text-on-surface flex items-center"><span class="text-muted w-4 mr-1 text-xs">#2</span> Lighting</span>
+<span class="text-primary font-bold text-xs bg-green-soft px-1.5 py-0.5 rounded">ON</span>
+</div>
+<div class="flex justify-between items-center bg-surface-container-high p-2 rounded text-sm border border-subtle">
+<span class="text-on-surface flex items-center"><span class="text-muted w-4 mr-1 text-xs">#3</span> TV</span>
+<span class="text-primary font-bold text-xs bg-green-soft px-1.5 py-0.5 rounded">ON</span>
+</div>
+<div class="flex justify-between items-center bg-surface-container-low p-2 rounded text-sm border border-subtle opacity-60">
+<span class="text-on-surface-variant flex items-center"><span class="text-muted w-4 mr-1 text-xs">#4</span> AC</span>
+<span class="text-red-500 font-bold text-xs bg-red-soft px-1.5 py-0.5 rounded">OFF</span>
+</div>
+<div class="flex justify-between items-center bg-surface-container-low p-2 rounded text-sm border border-subtle opacity-60">
+<span class="text-on-surface-variant flex items-center"><span class="text-muted w-4 mr-1 text-xs">#5</span> Water Heater</span>
+<span class="text-red-500 font-bold text-xs bg-red-soft px-1.5 py-0.5 rounded">OFF</span>
+</div>
+</div>
+</div>
+<!-- ROW 2 MODE CONTROL -->
+<div class="col-span-12 card-surface rounded-xl p-inner-padding">
+<h2 class="font-label-caps text-label-caps text-muted mb-4">Control Mode</h2>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+<!-- Active Mode -->
+<button class="bg-primary-container text-on-primary-container rounded-lg p-4 flex flex-col items-start transition-transform hover:scale-[0.98] border border-primary">
+<div class="flex items-center justify-between w-full mb-2">
+<span class="font-headline-md font-bold">XENSE MODE</span>
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<span class="font-body-md text-sm opacity-90 text-left">Smart plug auto-decides based on priorities.</span>
+</button>
+<!-- Bypass Mode -->
+<button class="bg-surface-container-high text-on-surface rounded-lg p-4 flex flex-col items-start border border-subtle hover:border-surface-variant transition-colors">
+<div class="flex items-center justify-between w-full mb-2">
+<span class="font-headline-md font-bold text-muted">BYPASS</span>
+<span class="material-symbols-outlined text-muted">block</span>
+</div>
+<span class="font-body-md text-sm text-muted text-left">Xense disabled. Manual control active.</span>
+</button>
+<!-- Auto Mode -->
+<button class="bg-surface-container-high text-on-surface rounded-lg p-4 flex flex-col items-start border border-subtle hover:border-surface-variant transition-colors">
+<div class="flex items-center justify-between w-full mb-2">
+<span class="font-headline-md font-bold text-muted">AUTO</span>
+<span class="material-symbols-outlined text-muted">autorenew</span>
+</div>
+<span class="font-body-md text-sm text-muted text-left">Xense active + grid backup permitted.</span>
+</button>
+</div>
+<div class="bg-blue-soft border-l-2 border-blue-500 p-3 rounded-r text-sm text-on-surface flex items-start">
+<span class="material-symbols-outlined text-blue-500 mr-2 text-[18px] mt-0.5">info</span>
+<span><strong>Xense Mode Active</strong> — last decision: AC turned OFF at 2:42 PM (Battery &lt; 35%)</span>
+</div>
+</div>
+<!-- ROW 3 LOAD DECISIONS -->
+<div class="col-span-12">
+<h2 class="font-label-caps text-label-caps text-muted mb-4 pl-1">Load Decisions</h2>
+<!-- Horizontal Scroll Container -->
+<div class="flex overflow-x-auto pb-4 gap-4 snap-x custom-scrollbar">
+<!-- Card 1 -->
+<div class="card-surface min-w-[230px] rounded-xl p-4 border border-subtle snap-start flex-shrink-0">
+<div class="flex justify-between items-start mb-3">
+<div class="bg-surface-container-high p-2 rounded-lg">
+<span class="material-symbols-outlined text-on-surface">kitchen</span>
+</div>
+<span class="font-label-caps text-[10px] text-muted">#1</span>
+</div>
+<h3 class="font-headline-md text-base text-on-surface mb-1">Fridge</h3>
+<div class="flex items-center mb-4">
+<span class="bg-green-soft text-primary px-2 py-0.5 rounded text-xs font-bold mr-2">ON</span>
+<span class="text-xs text-primary flex items-center"><span class="w-1.5 h-1.5 rounded-full bg-primary mr-1"></span> Optimal</span>
+</div>
+<p class="text-xs text-muted border-t border-subtle pt-2">Battery healthy. High priority load maintained.</p>
+</div>
+<!-- Card 2 -->
+<div class="card-surface min-w-[230px] rounded-xl p-4 border border-subtle snap-start flex-shrink-0">
+<div class="flex justify-between items-start mb-3">
+<div class="bg-surface-container-high p-2 rounded-lg">
+<span class="material-symbols-outlined text-on-surface">lightbulb</span>
+</div>
+<span class="font-label-caps text-[10px] text-muted">#2</span>
+</div>
+<h3 class="font-headline-md text-base text-on-surface mb-1">Lighting</h3>
+<div class="flex items-center mb-4">
+<span class="bg-green-soft text-primary px-2 py-0.5 rounded text-xs font-bold mr-2">ON</span>
+<span class="text-xs text-primary flex items-center"><span class="w-1.5 h-1.5 rounded-full bg-primary mr-1"></span> Optimal</span>
+</div>
+<p class="text-xs text-muted border-t border-subtle pt-2">Solar sufficient. Load comfortably supported.</p>
+</div>
+<!-- Card 3 -->
+<div class="card-surface min-w-[230px] rounded-xl p-4 border border-subtle snap-start flex-shrink-0">
+<div class="flex justify-between items-start mb-3">
+<div class="bg-surface-container-high p-2 rounded-lg">
+<span class="material-symbols-outlined text-on-surface">tv</span>
+</div>
+<span class="font-label-caps text-[10px] text-muted">#3</span>
+</div>
+<h3 class="font-headline-md text-base text-on-surface mb-1">TV</h3>
+<div class="flex items-center mb-4">
+<span class="bg-green-soft text-primary px-2 py-0.5 rounded text-xs font-bold mr-2">ON</span>
+<span class="text-xs text-primary flex items-center"><span class="w-1.5 h-1.5 rounded-full bg-primary mr-1"></span> Optimal</span>
+</div>
+<p class="text-xs text-muted border-t border-subtle pt-2">Within capacity limits. No shedding required.</p>
+</div>
+<!-- Card 4 (MUST BE OFF) -->
+<div class="card-surface min-w-[230px] rounded-xl p-4 border border-red-500/30 bg-gradient-to-b from-surface to-red-900/10 snap-start flex-shrink-0">
+<div class="flex justify-between items-start mb-3">
+<div class="bg-red-500/20 p-2 rounded-lg text-red-500">
+<span class="material-symbols-outlined">ac_unit</span>
+</div>
+<span class="font-label-caps text-[10px] text-muted">#4</span>
+</div>
+<h3 class="font-headline-md text-base text-on-surface mb-1 opacity-60">AC</h3>
+<div class="flex items-center mb-4">
+<span class="bg-red-soft text-red-500 px-2 py-0.5 rounded text-xs font-bold mr-2">OFF</span>
+<span class="text-xs text-red-500 flex items-center"><span class="w-1.5 h-1.5 rounded-full bg-red-500 mr-1 animate-pulse"></span> Critical</span>
+</div>
+<p class="text-xs text-red-400/80 border-t border-red-500/20 pt-2">Shed: Battery &lt; 35%. Lower priority load.</p>
+</div>
+<!-- Card 5 (MUST BE OFF) -->
+<div class="card-surface min-w-[230px] rounded-xl p-4 border border-red-500/30 bg-gradient-to-b from-surface to-red-900/10 snap-start flex-shrink-0">
+<div class="flex justify-between items-start mb-3">
+<div class="bg-red-500/20 p-2 rounded-lg text-red-500">
+<span class="material-symbols-outlined">water_heater</span>
+</div>
+<span class="font-label-caps text-[10px] text-muted">#5</span>
+</div>
+<h3 class="font-headline-md text-base text-on-surface mb-1 opacity-60">Water Heater</h3>
+<div class="flex items-center mb-4">
+<span class="bg-red-soft text-red-500 px-2 py-0.5 rounded text-xs font-bold mr-2">OFF</span>
+<span class="text-xs text-red-500 flex items-center"><span class="w-1.5 h-1.5 rounded-full bg-red-500 mr-1 animate-pulse"></span> Critical</span>
+</div>
+<p class="text-xs text-red-400/80 border-t border-red-500/20 pt-2">Shed: High draw appliance disabled to preserve runtime.</p>
+</div>
+</div>
+</div>
+<!-- ROW 4 CHARTS -->
+<div class="col-span-12 grid grid-cols-1 md:grid-cols-2 gap-grid-gutter">
+<!-- Left Chart: Battery Trend -->
+<div class="card-surface rounded-xl p-inner-padding border border-subtle h-64 flex flex-col relative overflow-hidden">
+<h2 class="font-label-caps text-label-caps text-muted mb-2 relative z-10">Battery Trend (60 min)</h2>
+<!-- Decorative CSS Chart -->
+<div class="absolute bottom-0 left-0 w-full h-32 opacity-20 bg-gradient-to-t from-primary to-transparent z-0"></div>
+<svg class="absolute bottom-0 left-0 w-full h-full z-0 preserve-3d" preserveaspectratio="none" viewbox="0 0 100 100">
+<path d="M0,100 L0,70 Q10,60 20,75 T40,65 T60,80 T80,60 L100,65 L100,100 Z" fill="rgba(34, 197, 94, 0.15)" stroke="#22C55E" stroke-width="2"></path>
+</svg>
+<div class="mt-auto relative z-10 flex justify-between items-end">
+<div>
+<span class="font-metric-lg text-metric-lg block text-on-surface">1.2 kWh</span>
+<span class="font-body-md text-xs text-muted">Energy saved today</span>
+</div>
+<div class="text-right">
+<span class="text-primary font-bold block">+0.4%</span>
+<span class="text-xs text-muted">Recovery</span>
+</div>
+</div>
+</div>
+<!-- Right Chart: Solar vs Load -->
+<div class="card-surface rounded-xl p-inner-padding border border-subtle h-64 flex flex-col relative overflow-hidden">
+<h2 class="font-label-caps text-label-caps text-muted mb-2 relative z-10">Today: Solar vs Load</h2>
+<!-- Decorative CSS Dual Line Chart -->
+<svg class="absolute bottom-4 left-0 w-full h-40 z-0 preserve-3d px-4" preserveaspectratio="none" viewbox="0 0 100 100">
+<!-- Solar (Orange Bell Curve) -->
+<path d="M0,100 Q20,100 30,80 T50,20 T70,80 Q80,100 100,100" fill="none" stroke="#F59E0B" stroke-dasharray="4" stroke-width="2"></path>
+<!-- Load (Blue Line) -->
+<path d="M0,80 L20,75 L30,60 L40,85 L60,40 L70,50 L80,90 L100,85" fill="none" stroke="#3B82F6" stroke-width="2"></path>
+</svg>
+<div class="mt-auto relative z-10 grid grid-cols-2 gap-4 border-t border-subtle pt-3">
+<div>
+<span class="font-body-md text-xs text-muted flex items-center"><span class="w-2 h-2 rounded-full bg-blue-500 mr-2"></span> Runtime</span>
+<span class="font-headline-md text-base text-on-surface block mt-1">16h 34m</span>
+</div>
+<div>
+<span class="font-body-md text-xs text-muted flex items-center"><span class="w-2 h-2 rounded-full bg-red-500 mr-2"></span> Temp</span>
+<span class="font-headline-md text-base text-on-surface block mt-1">35°C</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<style>
+        /* Hide scrollbar for Chrome, Safari and Opera */
+        .custom-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        /* Hide scrollbar for IE, Edge and Firefox */
+        .custom-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+    </style>
+</body></html>

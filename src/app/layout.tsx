@@ -33,15 +33,7 @@ export default function RootLayout({
           href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
           crossOrigin="anonymous"
           referrerPolicy="no-referrer"
-          media="print"
-          onLoad="this.media='all'"
         />
-        <noscript>
-          <link
-            rel="stylesheet"
-            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
-          />
-        </noscript>
       </head>
       <body className="min-h-full flex flex-col bg-[#0b0e14] text-[#e8edf5]">{children}</body>
     </html>

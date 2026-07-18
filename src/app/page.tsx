@@ -188,7 +188,7 @@ export default function DashboardPage() {
                 {live.device_online === "online" ? "Connected" : "Disconnected"}
               </span>
             </div>
-            <ModeSelector currentMode={live.mode} />
+            <ModeSelector deviceId={live.device_id} currentMode={live.mode} />
             <div className="mt-3 text-center text-[10px] text-[#5a6d8a]">
               <i className="fas fa-info-circle mr-1" />
               Firmware: {live.firmware_version} · Inverter: {live.inverter_temperature}°C · AC: {live.ac_voltage}V · {live.frequency}Hz

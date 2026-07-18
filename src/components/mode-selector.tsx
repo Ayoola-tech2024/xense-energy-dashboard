@@ -5,6 +5,7 @@ import { setMode } from "@/lib/api-service";
 import { useState } from "react";
 
 interface ModeSelectorProps {
+  deviceId: string;
   currentMode: Mode;
   onModeChange?: (mode: Mode) => void;
 }
@@ -31,6 +32,7 @@ const modes: { key: Mode; label: string; icon: string; desc: string }[] = [
 ];
 
 export default function ModeSelector({
+  deviceId,
   currentMode,
   onModeChange,
 }: ModeSelectorProps) {
@@ -41,7 +43,7 @@ export default function ModeSelector({
     if (mode === active || loading) return;
     setLoading(true);
     try {
-      await setMode("xs-plug-001", mode);
+      await setMode(deviceId, mode);
       setActive(mode);
       onModeChange?.(mode);
     } catch (err) {

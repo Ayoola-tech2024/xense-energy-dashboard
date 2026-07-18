@@ -8,6 +8,12 @@ interface DeviceTableProps {
   devices: Device[];
 }
 
+const applianceIcons: Record<string, string> = {
+  "Air Conditioner": "snowflake",
+  "Freezer": "temperature-low",
+  "TV & Entertainment": "tv",
+};
+
 export default function DeviceTable({ devices }: DeviceTableProps) {
   return (
     <div className="bg-[#12171f] border border-[#1e293b] rounded-[14px] overflow-hidden">
@@ -31,12 +37,10 @@ export default function DeviceTable({ devices }: DeviceTableProps) {
           <thead>
             <tr className="text-[10px] uppercase tracking-wider text-[#8899b4] font-semibold">
               <th className="text-left px-3 py-2.5 border-b border-[#1e293b]">Device</th>
-              <th className="text-left px-3 py-2.5 border-b border-[#1e293b]">Appliance</th>
               <th className="text-left px-3 py-2.5 border-b border-[#1e293b]">Status</th>
               <th className="text-left px-3 py-2.5 border-b border-[#1e293b]">Mode</th>
+              <th className="text-left px-3 py-2.5 border-b border-[#1e293b]">Load</th>
               <th className="text-left px-3 py-2.5 border-b border-[#1e293b]">Power</th>
-              <th className="text-left px-3 py-2.5 border-b border-[#1e293b]">Signal</th>
-              <th className="text-left px-3 py-2.5 border-b border-[#1e293b]">Relay</th>
             </tr>
           </thead>
           <tbody>
@@ -55,8 +59,6 @@ function DeviceRow({ device }: { device: Device }) {
   const [loading, setLoading] = useState(false);
 
   const statusColor = device.online ? "#34d399" : "#f87171";
-  const signalColor =
-    device.signal >= -55 ? "#34d399" : device.signal >= -70 ? "#fbbf24" : "#f87171";
 
   const modeColors: Record<string, string> = {
     xense: "rgba(45,212,191,0.12)",
@@ -68,6 +70,8 @@ function DeviceRow({ device }: { device: Device }) {
     bypass: "#60a5fa",
     auto: "#fbbf24",
   };
+
+  const iconName = applianceIcons[device.appliance] || "plug";
 
   const handleToggle = async () => {
     setLoading(true);
@@ -94,13 +98,13 @@ function DeviceRow({ device }: { device: Device }) {
               color: device.online ? "#34d399" : "#f87171",
             }}
           >
-            <i className="fas fa-plug" />
+            <i className={`fas fa-${iconName}`} />
           </div>
-          {device.id}
+          <div>
+            <div>{device.appliance}</div>
+            <div className="text-[10px] text-[#5a6d8a] font-normal">{device.location}</div>
+          </div>
         </div>
-      </td>
-      <td className="px-3 py-3 border-b border-[#1e293b] text-[#8899b4]">
-        {device.appliance}
       </td>
       <td className="px-3 py-3 border-b border-[#1e293b]">
         <span className="flex items-center gap-1.5 text-xs">
@@ -124,17 +128,8 @@ function DeviceRow({ device }: { device: Device }) {
           {device.mode.charAt(0).toUpperCase() + device.mode.slice(1)}
         </span>
       </td>
-      <td className="px-3 py-3 border-b border-[#1e293b] text-[#e8edf5]">
-        {device.power.toLocaleString()} W
-      </td>
-      <td className="px-3 py-3 border-b border-[#1e293b]">
-        <i
-          className="fas fa-signal text-sm"
-          style={{ color: signalColor }}
-        />
-        <span className="text-[10px] text-[#5a6d8a] ml-1">
-          {device.signal} dBm
-        </span>
+      <td className="px-3 py-3 border-b border-[#1e293b] text-[#8899b4] text-xs">
+        {device.power > 0 ? `${device.power.toLocaleString()} W` : "—"}
       </td>
       <td className="px-3 py-3 border-b border-[#1e293b]">
         <button

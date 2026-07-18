@@ -61,42 +61,34 @@ export default function AnalyticsPage() {
             ))}
           </div>
 
-          {/* Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="bg-[#12171f] border border-[#1e293b] rounded-[14px] p-5">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-[#8899b4]">
-                  Solar Production
-                </h3>
-                <span className="text-sm font-bold text-[#fbbf24]">
-                  {data.live.today_production} kWh
+          {/* Charts — merged into one */}
+          <div className="bg-[#12171f] border border-[#1e293b] rounded-[14px] p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-[#8899b4]">
+                Production vs Consumption
+              </h3>
+              <div className="flex items-center gap-4 text-[10px]">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-[2px] bg-[#fbbf24] rounded-full inline-block" />
+                  <span className="text-[#8899b4]">Production</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-[2px] bg-[#60a5fa] rounded-full inline-block border-dashed" style={{ borderTop: "2px dashed #60a5fa", height: 0, width: 12 }} />
+                  <span className="text-[#8899b4]">Consumption</span>
                 </span>
               </div>
-              <SimpleChart
-                data={chartData}
-                color="#fbbf24"
-                gradientId="prodGradAnalytics"
-                height={180}
-              />
             </div>
-            <div className="bg-[#12171f] border border-[#1e293b] rounded-[14px] p-5">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-[#8899b4]">
-                  Consumption
-                </h3>
-                <span className="text-sm font-bold text-[#60a5fa]">
-                  {data.live.today_consumption} kWh
-                </span>
-              </div>
-              <SimpleChart
-                data={chartData.map((d) => ({
-                  ...d,
-                  production: d.consumption,
-                }))}
-                color="#60a5fa"
-                gradientId="consGradAnalytics"
-                height={180}
-              />
+            <SimpleChart
+              data={chartData}
+              color="#fbbf24"
+              gradientId="prodGradAnalytics"
+              height={220}
+              showBoth
+              secondColor="#60a5fa"
+            />
+            <div className="flex items-center gap-4 mt-3 text-xs">
+              <span className="text-[#fbbf24] font-semibold">{data.live.today_production} kWh produced</span>
+              <span className="text-[#60a5fa] font-semibold">{data.live.today_consumption} kWh consumed</span>
             </div>
           </div>
 
@@ -140,47 +132,35 @@ export default function AnalyticsPage() {
             />
           </div>
 
-          {/* Detailed Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="bg-[#12171f] border border-[#1e293b] rounded-[14px] p-4">
-              <div className="text-[10px] uppercase tracking-wider text-[#5a6d8a] font-semibold mb-1">
-                <i className="fas fa-sun text-[#fbbf24] mr-1.5" />
+          {/* Detailed Stats — smaller */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-[#12171f] border border-[#1e293b] rounded-[10px] p-3">
+              <div className="text-[9px] uppercase tracking-wider text-[#5a6d8a] font-semibold mb-0.5">
+                <i className="fas fa-sun text-[#fbbf24] mr-1" />
                 Peak Production
               </div>
-              <div className="text-xl font-bold text-[#e8edf5]">3.8 kW</div>
-              <div className="text-[10px] text-[#5a6d8a] mt-0.5">
-                Today at 1:00 PM
-              </div>
+              <div className="text-lg font-bold text-[#e8edf5]">3.8 kW</div>
             </div>
-            <div className="bg-[#12171f] border border-[#1e293b] rounded-[14px] p-4">
-              <div className="text-[10px] uppercase tracking-wider text-[#5a6d8a] font-semibold mb-1">
-                <i className="fas fa-bolt text-[#60a5fa] mr-1.5" />
+            <div className="bg-[#12171f] border border-[#1e293b] rounded-[10px] p-3">
+              <div className="text-[9px] uppercase tracking-wider text-[#5a6d8a] font-semibold mb-0.5">
+                <i className="fas fa-bolt text-[#60a5fa] mr-1" />
                 Peak Load
               </div>
-              <div className="text-xl font-bold text-[#e8edf5]">1.2 kW</div>
-              <div className="text-[10px] text-[#5a6d8a] mt-0.5">
-                Today at 2:30 PM
-              </div>
+              <div className="text-lg font-bold text-[#e8edf5]">1.2 kW</div>
             </div>
-            <div className="bg-[#12171f] border border-[#1e293b] rounded-[14px] p-4">
-              <div className="text-[10px] uppercase tracking-wider text-[#5a6d8a] font-semibold mb-1">
-                <i className="fas fa-clock text-[#2dd4bf] mr-1.5" />
+            <div className="bg-[#12171f] border border-[#1e293b] rounded-[10px] p-3">
+              <div className="text-[9px] uppercase tracking-wider text-[#5a6d8a] font-semibold mb-0.5">
+                <i className="fas fa-clock text-[#2dd4bf] mr-1" />
                 System Runtime
               </div>
-              <div className="text-xl font-bold text-[#e8edf5]">16h 34m</div>
-              <div className="text-[10px] text-[#5a6d8a] mt-0.5">
-                Today
-              </div>
+              <div className="text-lg font-bold text-[#e8edf5]">16h 34m</div>
             </div>
-            <div className="bg-[#12171f] border border-[#1e293b] rounded-[14px] p-4">
-              <div className="text-[10px] uppercase tracking-wider text-[#5a6d8a] font-semibold mb-1">
-                <i className="fas fa-cloud-sun text-[#a78bfa] mr-1.5" />
+            <div className="bg-[#12171f] border border-[#1e293b] rounded-[10px] p-3">
+              <div className="text-[9px] uppercase tracking-wider text-[#5a6d8a] font-semibold mb-0.5">
+                <i className="fas fa-cloud-sun text-[#a78bfa] mr-1" />
                 Grid Dependency
               </div>
-              <div className="text-xl font-bold text-[#34d399]">0%</div>
-              <div className="text-[10px] text-[#5a6d8a] mt-0.5">
-                Fully solar-powered
-              </div>
+              <div className="text-lg font-bold text-[#34d399]">0%</div>
             </div>
           </div>
         </main>

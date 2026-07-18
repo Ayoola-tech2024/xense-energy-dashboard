@@ -39,30 +39,7 @@ export default function DecisionsPage() {
           subtitle="Every decision Xense makes is explained — full transparency on why your appliances turn on or off"
         />
         <main className="flex-1 p-5 lg:p-7 space-y-4 page-enter">
-          {/* Period Tabs */}
-          <div className="flex gap-1 bg-[#0b0e14] rounded-[10px] p-0.5 w-fit">
-            {["Today", "Last 7 Days", "History"].map((p) => (
-              <button
-                key={p}
-                className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                  p === "Today"
-                    ? "bg-[#12171f] text-[#e8edf5]"
-                    : "text-[#8899b4] hover:text-[#e8edf5]"
-                }`}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-
-          {/* Decision cards */}
-          <div className="space-y-2.5">
-            {data.decisions.map((d) => (
-              <DecisionCard key={d.id} {...d} />
-            ))}
-          </div>
-
-          {/* Summary */}
+          {/* Summary — at the top */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="bg-[#12171f] border border-[#1e293b] rounded-[14px] p-4">
               <div className="text-[10px] uppercase tracking-wider text-[#5a6d8a] font-semibold mb-1">
@@ -94,6 +71,29 @@ export default function DecisionsPage() {
                 Awaiting conditions
               </div>
             </div>
+          </div>
+
+          {/* Period Tabs */}
+          <div className="flex gap-1 bg-[#0b0e14] rounded-[10px] p-0.5 w-fit">
+            {["Today", "Last 7 Days", "History"].map((p) => (
+              <button
+                key={p}
+                className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  p === "Today"
+                    ? "bg-[#12171f] text-[#e8edf5]"
+                    : "text-[#8899b4] hover:text-[#e8edf5]"
+                }`}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+
+          {/* Decision cards */}
+          <div className="space-y-2.5">
+            {data.decisions.map((d) => (
+              <DecisionCard key={d.id} {...d} />
+            ))}
           </div>
         </main>
       </div>

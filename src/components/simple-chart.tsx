@@ -4,6 +4,8 @@ interface SimpleChartProps {
   gradientId: string;
   height?: number;
   loading?: boolean;
+  showBoth?: boolean;
+  secondColor?: string;
 }
 
 export default function SimpleChart({
@@ -12,6 +14,8 @@ export default function SimpleChart({
   gradientId,
   height = 180,
   loading,
+  showBoth = false,
+  secondColor = "#60a5fa",
 }: SimpleChartProps) {
   if (loading) {
     return (
@@ -33,7 +37,14 @@ export default function SimpleChart({
     );
   }
 
-  const maxVal = Math.max(...data.map((d) => Math.max(d.production, d.consumption)), 1);
+  const maxVal = Math.max(
+    ...data.map((d) =>
+      showBoth
+        ? Math.max(d.production, d.consumption)
+        : Math.max(d.production, d.consumption)
+    ),
+    1
+  );
   const w = 400;
   const h = height;
   const padding = { top: 10, bottom: 20, left: 0, right: 0 };
@@ -48,7 +59,7 @@ export default function SimpleChart({
     .map((d, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(d.production).toFixed(1)}`)
     .join(" ");
 
-  const areaPath = `${prodPath} L${toX(data.length - 1).toFixed(1)},${(padding.top + chartH).toFixed(1)} L${toX(0).toFixed(1)},${(padding.top + chartH).toFixed(1)} Z`;
+  const prodArea = `${prodPath} L${toX(data.length - 1).toFixed(1)},${(padding.top + chartH).toFixed(1)} L${toX(0).toFixed(1)},${(padding.top + chartH).toFixed(1)} Z`;
 
   return (
     <svg
@@ -62,8 +73,15 @@ export default function SimpleChart({
           <stop offset="0%" stopColor={color} stopOpacity="0.35" />
           <stop offset="100%" stopColor={color} stopOpacity="0.02" />
         </linearGradient>
+        {showBoth && (
+          <linearGradient id={`${gradientId}Cons`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={secondColor} stopOpacity="0.25" />
+            <stop offset="100%" stopColor={secondColor} stopOpacity="0.02" />
+          </linearGradient>
+        )}
       </defs>
-      <path d={areaPath} fill={`url(#${gradientId})`} />
+      {/* Production area + line */}
+      <path d={prodArea} fill={`url(#${gradientId})`} />
       <path
         d={prodPath}
         stroke={color}
@@ -72,6 +90,22 @@ export default function SimpleChart({
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+      {/* Consumption line (when merged) */}
+      {showBoth && (
+        <>
+          <path
+            d={data
+              .map((d, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(d.consumption).toFixed(1)}`)
+              .join(" ")}
+            stroke={secondColor}
+            strokeWidth="2"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray="6 3"
+          />
+        </>
+      )}
       {/* Time labels */}
       {[0, Math.floor(data.length / 2), data.length - 1].map((i) => (
         <text

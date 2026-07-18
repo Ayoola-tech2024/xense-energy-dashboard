@@ -1,5 +1,5 @@
 // ─── API Service Layer ───
-// Live data + devices from InsForge. Decisions, rules, notifications = mock (no DB tables yet).
+// All data from InsForge. Mock fallbacks only if API fails.
 
 import { insforge } from "./insforge";
 import { mockDashboardData } from "./mock-data";
@@ -85,58 +85,47 @@ export async function fetchDevices(): Promise<Device[]> {
   }));
 }
 
-// ─── Chart Data (derived from recent readings) ───
+// ─── Chart Data (from hourly summary) ───
 
 export async function fetchChartData(deviceId: string = "esp32-xs-001"): Promise<ChartData[]> {
   const { data, error } = await insforge.database
-    .from("energy_readings")
-    .select("timestamp, pv_power, load_power")
+    .from("hourly_energy_summary")
+    .select("hour_start, avg_pv_power, avg_load_power")
     .eq("device_id", deviceId)
-    .order("timestamp", { ascending: false })
-    .limit(50);
+    .order("hour_start", { ascending: false })
+    .limit(24);
 
   if (error || !data || data.length === 0) {
     return mockDashboardData.chartData;
   }
 
-  // Group by hour and average
-  const byHour = new Map<string, { prod: number[]; cons: number[] }>();
-  for (const row of data) {
-    const hour = new Date(row.timestamp).toTimeString().slice(0, 5);
-    const existing = byHour.get(hour) ?? { prod: [], cons: [] };
-    existing.prod.push(Number(row.pv_power) / 1000);
-    existing.cons.push(Number(row.load_power) / 1000);
-    byHour.set(hour, existing);
-  }
-
-  return Array.from(byHour.entries())
-    .map(([time, { prod, cons }]) => ({
-      time,
-      production: Math.round((prod.reduce((a, b) => a + b, 0) / prod.length) * 10) / 10,
-      consumption: Math.round((cons.reduce((a, b) => a + b, 0) / cons.length) * 10) / 10,
+  return data
+    .map((row) => ({
+      time: new Date(row.hour_start).toTimeString().slice(0, 5),
+      production: Math.round((Number(row.avg_pv_power) / 1000) * 10) / 10,
+      consumption: Math.round((Number(row.avg_load_power) / 1000) * 10) / 10,
     }))
     .reverse();
 }
 
-// ─── Energy Totals (derived from today's readings) ───
+// ─── Energy Totals (from daily summary) ───
 
 export async function fetchEnergyTotals(deviceId: string = "esp32-xs-001"): Promise<EnergyTotals> {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = new Date().toISOString().split("T")[0];
 
   const { data, error } = await insforge.database
-    .from("energy_readings")
-    .select("pv_power, load_power")
+    .from("daily_energy_summary")
+    .select("total_pv_kwh, total_load_kwh")
     .eq("device_id", deviceId)
-    .gte("timestamp", today.toISOString())
-    .order("timestamp", { ascending: false });
+    .eq("day_date", today);
 
   if (error || !data || data.length === 0) {
     return mockDashboardData.totals;
   }
 
-  const totalProd = data.reduce((sum, r) => sum + (Number(r.pv_power) || 0), 0) / 1000;
-  const totalCons = data.reduce((sum, r) => sum + (Number(r.load_power) || 0), 0) / 1000;
+  const row = data[0];
+  const totalProd = Number(row.total_pv_kwh) || 0;
+  const totalCons = Number(row.total_load_kwh) || 0;
   const saved = Math.max(0, totalProd - totalCons);
 
   return {
@@ -148,18 +137,93 @@ export async function fetchEnergyTotals(deviceId: string = "esp32-xs-001"): Prom
   };
 }
 
-// ─── Mock-only data (no DB tables yet) ───
+// ─── Decisions (from DB) ───
 
 export async function fetchDecisions(): Promise<AiDecision[]> {
-  return mockDashboardData.decisions;
+  const { data, error } = await insforge.database
+    .from("ai_decisions")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (error || !data) {
+    console.warn("[API] Falling back to mock decisions:", error?.message);
+    return mockDashboardData.decisions;
+  }
+
+  return data.map((row) => ({
+    id: row.id,
+    appliance: row.appliance,
+    icon: row.icon ?? "bolt",
+    status: row.status as AiDecision["status"],
+    reason: row.reason ?? "",
+    time: new Date(row.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+    load: Number(row.load_watts) ?? 0,
+    confidence: row.confidence ?? "Pending",
+    duration: row.duration ?? undefined,
+    priority: Number(row.priority) ?? 0,
+  }));
 }
+
+// ─── Rules (from DB) ───
 
 export async function fetchRules(): Promise<AutomationRule[]> {
-  return mockDashboardData.rules;
+  const { data, error } = await insforge.database
+    .from("automation_rules")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error || !data) {
+    console.warn("[API] Falling back to mock rules:", error?.message);
+    return mockDashboardData.rules;
+  }
+
+  return data.map((row) => ({
+    id: row.id,
+    condition: row.condition_text,
+    action: row.action_text,
+    active: Boolean(row.active),
+    icon: row.icon ?? "bolt",
+    iconBg: row.icon_bg ?? "rgba(96,165,250,0.1)",
+    iconColor: row.icon_color ?? "#60a5fa",
+  }));
 }
 
+// ─── Notifications (from DB) ───
+
 export async function fetchNotifications(): Promise<NotificationItem[]> {
-  return mockDashboardData.notifications;
+  const { data, error } = await insforge.database
+    .from("notifications")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (error || !data) {
+    console.warn("[API] Falling back to mock notifications:", error?.message);
+    return mockDashboardData.notifications;
+  }
+
+  return data.map((row) => ({
+    id: row.id,
+    icon: row.icon ?? "bell",
+    iconBg: row.icon_bg ?? "rgba(96,165,250,0.1)",
+    iconColor: row.icon_color ?? "#60a5fa",
+    title: row.title,
+    description: row.description ?? "",
+    time: formatTimeAgo(row.created_at),
+    unread: Boolean(row.unread),
+  }));
+}
+
+function formatTimeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }
 
 // ─── Combined dashboard fetch ───

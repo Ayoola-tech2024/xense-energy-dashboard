@@ -26,14 +26,14 @@ if (!BASE || !KEY) {
   process.exit(1)
 }
 
-// ── REST helpers ──
-const headers = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' }
+// ── REST helpers (InsForge uses /api/database/records/, not /rest/v1/) ──
+const headers = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' }
 
 async function restInsert(table: string, row: Record<string, unknown>) {
-  const res = await fetch(`${BASE}/rest/v1/${table}`, {
+  const res = await fetch(`${BASE}/api/database/records/${table}`, {
     method: 'POST',
-    headers,
-    body: JSON.stringify(row),
+    headers: { ...headers, Prefer: 'return=minimal' },
+    body: JSON.stringify([row]),
   })
   if (!res.ok) {
     const text = await res.text()
@@ -42,7 +42,7 @@ async function restInsert(table: string, row: Record<string, unknown>) {
 }
 
 async function restSelect(table: string, query: string) {
-  const res = await fetch(`${BASE}/rest/v1/${table}?select=device_id&${query}`, {
+  const res = await fetch(`${BASE}/api/database/records/${table}?select=device_id&${query}`, {
     headers: { apikey: KEY, Authorization: `Bearer ${KEY}` },
   })
   if (!res.ok) return []

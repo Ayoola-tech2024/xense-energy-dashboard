@@ -26,7 +26,7 @@ if (!BASE || !KEY) {
   process.exit(1)
 }
 
-// ── REST helpers (InsForge uses /api/database/records/, not /rest/v1/) ──
+// ── REST helpers (InsForge uses /api/database/records/) ──
 const headers = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' }
 
 async function restInsert(table: string, row: Record<string, unknown>) {
@@ -41,14 +41,6 @@ async function restInsert(table: string, row: Record<string, unknown>) {
   }
 }
 
-async function restSelect(table: string, query: string) {
-  const res = await fetch(`${BASE}/api/database/records/${table}?select=device_id&${query}`, {
-    headers: { apikey: KEY, Authorization: `Bearer ${KEY}` },
-  })
-  if (!res.ok) return []
-  return res.json() as Promise<unknown[]>
-}
-
 // ── Config ──
 const intervalMs = parseInt(process.argv.find(a => a.startsWith('--interval='))?.split('=')[1] ?? '3000', 10)
 const DEVICE_ID = 'esp32-xs-001'
@@ -60,7 +52,6 @@ let prodToday = 0
 let consToday = 0
 let startTime = Date.now()
 let batterySoc = 50
-let deviceDone = false
 
 process.on('SIGINT', () => {
   running = false
@@ -117,27 +108,39 @@ function genReading() {
     }
   }
 
-  const solarVoltage = 48 + n() * 4
-  const solarCurr = solarVoltage > 0.1 ? solarPower / solarVoltage : 0
+  const pvVoltage = 48 + n() * 4
+  const pvCurrent = pvVoltage > 0.1 ? solarPower / pvVoltage : 0
   const battVoltage = 51 + n() * 2
-  const battCurr = battVoltage > 0.1 ? batteryPower / battVoltage : 0
+  const battTemp = 25 + n() * 5 + (batterySoc > 80 ? 5 : 0)
+  const battCharging = batteryPower > 0
+  const battDischarging = batteryPower < 0
 
   prodToday += solarPower * (intervalMs / 3600000)
   consToday += loadPower * (intervalMs / 3600000)
 
   return {
     device_id: DEVICE_ID,
-    solar_voltage: +solarVoltage.toFixed(1),
-    solar_current: +solarCurr.toFixed(2),
-    solar_power: +solarPower.toFixed(1),
+    pv_voltage: +pvVoltage.toFixed(1),
+    pv_current: +pvCurrent.toFixed(2),
+    pv_power: +solarPower.toFixed(1),
+    battery_percent: +batterySoc.toFixed(1),
     battery_voltage: +battVoltage.toFixed(1),
-    battery_current: +battCurr.toFixed(2),
-    battery_power: +batteryPower.toFixed(1),
-    battery_soc: +batterySoc.toFixed(1),
+    battery_temperature: +battTemp.toFixed(1),
+    battery_charging: battCharging,
+    battery_discharging: battDischarging,
     load_power: +loadPower.toFixed(1),
     grid_power: +gridPower.toFixed(1),
-    grid_available: gridAvail,
-    energy_today: +prodToday.toFixed(3),
+    grid_status: gridAvail ? 'available' : 'unavailable',
+    frequency: +(50 + n() * 0.2).toFixed(1),
+    ac_voltage: +(230 + n() * 3).toFixed(1),
+    today_production: +prodToday.toFixed(3),
+    today_consumption: +consToday.toFixed(3),
+    relay_state: 'closed',
+    mode: 'auto',
+    device_online: 'online',
+    wifi_strength: Math.round(-55 + n() * 10),
+    firmware_version: '2.1.0',
+    inverter_temperature: Math.round(35 + n() * 8),
     timestamp: new Date().toISOString(),
   }
 }
@@ -145,27 +148,6 @@ function genReading() {
 async function tick() {
   if (!running) return
   const reading = genReading()
-
-  if (!deviceDone) {
-    try {
-      const existing = await restSelect('devices', `device_id=eq.${DEVICE_ID}`)
-      if (!existing.length) {
-        await restInsert('devices', {
-          device_id: DEVICE_ID,
-          name: 'Xense Solar Inverter',
-          type: 'inverter',
-          model: 'XS-3000',
-          firmware_version: '2.1.0',
-          location: 'Main Panel',
-          status: 'online',
-          last_seen: new Date().toISOString(),
-        })
-      }
-    } catch (e) {
-      console.error('[DEVICE INSERT ERROR]', e)
-    }
-    deviceDone = true
-  }
 
   try {
     await restInsert('energy_readings', reading)
@@ -180,7 +162,7 @@ async function tick() {
   const gridStr = reading.grid_power >= 0
     ? `⬇ ${reading.grid_power.toFixed(0)}W grid`
     : `⬆ ${(-reading.grid_power).toFixed(0)}W export`
-  console.log(`[${timeStr}]  solar ${reading.solar_power.toFixed(0)}W | batt ${reading.battery_soc}% | load ${reading.load_power.toFixed(0)}W | ${gridStr} | ${prodToday.toFixed(2)}kWh today`)
+  console.log(`[${timeStr}]  solar ${reading.pv_power.toFixed(0)}W | batt ${reading.battery_percent}% | load ${reading.load_power.toFixed(0)}W | ${gridStr} | ${prodToday.toFixed(2)}kWh today`)
 }
 
 console.log('Xense Energy — Hardware Simulation')

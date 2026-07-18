@@ -1,7 +1,10 @@
-import { createClient } from '@insforge/sdk'
+// Xense Energy — Hardware Simulation (plain fetch, no SDK dependency)
+// Posts realistic energy readings to InsForge REST API every N seconds.
+
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
 
+// ── Load .env.local ──
 const envPath = resolve(process.cwd(), '.env.local')
 const envRaw = readFileSync(envPath, 'utf-8')
 for (const line of envRaw.split('\n')) {
@@ -16,15 +19,37 @@ for (const line of envRaw.split('\n')) {
   if (!process.env[key]) process.env[key] = val
 }
 
-const URL = process.env.NEXT_PUBLIC_INSFORGE_URL
+const BASE = process.env.NEXT_PUBLIC_INSFORGE_URL
 const KEY = process.env.NEXT_PUBLIC_INSFORGE_ANON_KEY
-if (!URL || !KEY) {
+if (!BASE || !KEY) {
   console.error('Missing NEXT_PUBLIC_INSFORGE_URL or NEXT_PUBLIC_INSFORGE_ANON_KEY in .env.local')
   process.exit(1)
 }
 
-const insforge = createClient({ baseUrl: URL, anonKey: KEY })
+// ── REST helpers ──
+const headers = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' }
 
+async function restInsert(table: string, row: Record<string, unknown>) {
+  const res = await fetch(`${BASE}/rest/v1/${table}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(row),
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`POST ${table} ${res.status}: ${text}`)
+  }
+}
+
+async function restSelect(table: string, query: string) {
+  const res = await fetch(`${BASE}/rest/v1/${table}?select=device_id&${query}`, {
+    headers: { apikey: KEY, Authorization: `Bearer ${KEY}` },
+  })
+  if (!res.ok) return []
+  return res.json() as Promise<unknown[]>
+}
+
+// ── Config ──
 const intervalMs = parseInt(process.argv.find(a => a.startsWith('--interval='))?.split('=')[1] ?? '3000', 10)
 const DEVICE_ID = 'esp32-xs-001'
 const CYCLE_MS = 8 * 60 * 1000
@@ -122,26 +147,30 @@ async function tick() {
   const reading = genReading()
 
   if (!deviceDone) {
-    const { data: existing } = await insforge.database.from('devices').select('device_id').eq('device_id', DEVICE_ID)
-    if (!existing?.length) {
-      const { error: insertErr } = await insforge.database.from('devices').insert([{
-        device_id: DEVICE_ID,
-        name: 'Xense Solar Inverter',
-        type: 'inverter',
-        model: 'XS-3000',
-        firmware_version: '2.1.0',
-        location: 'Main Panel',
-        status: 'online',
-        last_seen: new Date().toISOString(),
-      }])
-      if (insertErr) console.error('[DEVICE INSERT ERROR]', insertErr)
+    try {
+      const existing = await restSelect('devices', `device_id=eq.${DEVICE_ID}`)
+      if (!existing.length) {
+        await restInsert('devices', {
+          device_id: DEVICE_ID,
+          name: 'Xense Solar Inverter',
+          type: 'inverter',
+          model: 'XS-3000',
+          firmware_version: '2.1.0',
+          location: 'Main Panel',
+          status: 'online',
+          last_seen: new Date().toISOString(),
+        })
+      }
+    } catch (e) {
+      console.error('[DEVICE INSERT ERROR]', e)
     }
     deviceDone = true
   }
 
-  const { error } = await insforge.database.from('energy_readings').insert([reading])
-  if (error) {
-    console.error('[INSERT ERROR]', error)
+  try {
+    await restInsert('energy_readings', reading)
+  } catch (e) {
+    console.error('[INSERT ERROR]', e)
     return
   }
 

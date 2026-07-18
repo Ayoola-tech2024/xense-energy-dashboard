@@ -20,3 +20,25 @@ Key patterns:
 - Reference users with `auth.users(id)`; use `auth.uid()` in RLS policies.
 - For storage uploads, persist both the returned `url` and `key`.
 <!-- INSFORGE:END -->
+
+<!-- SESSION CHECKPOINT (2026-07-18): Hardware Simulation System -->
+## Built — Hardware Simulation Engine
+
+### Files
+- `scripts/simulate.ts` — Standalone CLI script that mimics ESP32 hardware. Run with: `npx tsx scripts/simulate.ts --interval 3000`
+  - Posts realistic energy readings to InsForge's `energy_readings` table every N seconds
+  - Auto-creates device `esp32-xs-001` in `devices` table on first tick
+  - Models: solar bell curve, battery charge/discharge, load by time-of-day, cloud cover, grid flicker
+  - Stop with Ctrl+C. Data persists in DB.
+- `src/lib/api-service.ts` — `fetchLiveData()` column mapping fixed: `solar_voltage → pv_voltage`, `battery_soc → battery_percent`, `energy_today → today_production`, `grid_available → grid_status`, etc.
+- `src/app/page.tsx` — Dashboard polls InsForge every 3 seconds for live updates.
+
+### To test locally
+1. Terminal 1: `npm run dev`
+2. Terminal 2: `npx tsx scripts/simulate.ts --interval 3000`
+3. Open `http://localhost:3000`
+
+### Pending (next session)
+- **Deploy to Vercel** — push to GitHub remote, connect Vercel, get live URL
+- Send the URL + anon key to the embedded systems engineer so they can test against the same endpoint
+<!-- END SESSION CHECKPOINT -->

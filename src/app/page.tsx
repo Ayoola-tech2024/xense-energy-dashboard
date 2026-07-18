@@ -19,10 +19,15 @@ export default function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    fetchDashboardData().then((d) => {
-      setData(d);
-      setLoading(false);
-    });
+    const load = () =>
+      fetchDashboardData().then((d) => {
+        setData(d);
+        setLoading(false);
+      });
+
+    load();
+    const interval = setInterval(load, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   if (loading) {

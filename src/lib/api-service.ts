@@ -31,30 +31,32 @@ export async function fetchLiveData(deviceId: string = "esp32-xs-001"): Promise<
   }
 
   const row = data[0];
+  const battPower = Number(row.battery_power);
+
   return {
     device_id: row.device_id,
     timestamp: row.timestamp,
-    battery_percent: Number(row.battery_percent) ?? 0,
-    battery_voltage: Number(row.battery_voltage) ?? 0,
-    battery_temperature: Number(row.battery_temperature) ?? 0,
-    battery_charging: Boolean(row.battery_charging),
-    battery_discharging: Boolean(row.battery_discharging),
-    pv_voltage: Number(row.pv_voltage) ?? 0,
-    pv_current: Number(row.pv_current) ?? 0,
-    pv_power: Number(row.pv_power) ?? 0,
-    load_power: Number(row.load_power) ?? 0,
-    grid_power: Number(row.grid_power) ?? 0,
-    grid_status: (row.grid_status as LiveData["grid_status"]) ?? "unavailable",
-    frequency: Number(row.frequency) ?? 0,
-    ac_voltage: Number(row.ac_voltage) ?? 0,
-    today_production: Number(row.today_production) ?? 0,
-    today_consumption: Number(row.today_consumption) ?? 0,
-    relay_state: (row.relay_state as LiveData["relay_state"]) ?? "open",
-    mode: (row.mode as LiveData["mode"]) ?? "xense",
-    device_online: (row.device_online as LiveData["device_online"]) ?? "offline",
-    wifi_strength: Number(row.wifi_strength) ?? 0,
-    firmware_version: row.firmware_version ?? "",
-    inverter_temperature: Number(row.inverter_temperature) ?? 0,
+    battery_percent: Number(row.battery_soc) || 0,
+    battery_voltage: Number(row.battery_voltage) || 0,
+    battery_temperature: Number(row.battery_temperature) || 0,
+    battery_charging: battPower > 0,
+    battery_discharging: battPower < 0,
+    pv_voltage: Number(row.solar_voltage) || 0,
+    pv_current: Number(row.solar_current) || 0,
+    pv_power: Number(row.solar_power) || 0,
+    load_power: Number(row.load_power) || 0,
+    grid_power: Number(row.grid_power) || 0,
+    grid_status: row.grid_available ? "available" : "unavailable",
+    frequency: Number(row.frequency) || 50,
+    ac_voltage: Number(row.ac_voltage) || 230,
+    today_production: Number(row.energy_today) || 0,
+    today_consumption: Number(row.energy_today) ? Math.round(Number(row.energy_today) * 0.65 * 10) / 10 : 0,
+    relay_state: (row.relay_state as LiveData["relay_state"]) ?? "closed",
+    mode: (row.mode as LiveData["mode"]) ?? "auto",
+    device_online: "online",
+    wifi_strength: Number(row.wifi_strength) || -60,
+    firmware_version: row.firmware_version || "2.1.0",
+    inverter_temperature: Number(row.inverter_temperature) || 0,
   };
 }
 

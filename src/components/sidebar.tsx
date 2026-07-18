@@ -49,9 +49,11 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       >
         {/* Brand */}
         <div className="flex items-center gap-3 px-5 py-5 border-b border-[#1e293b]">
-          <div className="w-9 h-9 rounded-[10px] bg-gradient-to-br from-[#2dd4bf] to-[#0891b2] flex items-center justify-center text-white font-extrabold text-lg">
-            X
-          </div>
+          <img
+            src="/logo.jpeg"
+            alt="Xense Energy"
+            className="w-9 h-9 rounded-[10px] object-cover"
+          />
           <div>
             <h1 className="text-[15px] font-bold tracking-tight text-[#e8edf5]">
               Xense Energy

@@ -15,6 +15,25 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Xense Energy — Intelligent Load Control",
   description: "Real-time monitoring and AI-powered load control for your energy system",
+  icons: {
+    icon: "/logo.jpeg",
+    shortcut: "/logo.jpeg",
+    apple: "/logo.jpeg",
+  },
+  openGraph: {
+    title: "Xense Energy — Intelligent Load Control",
+    description: "Real-time monitoring and AI-powered load control for your energy system",
+    images: [{ url: "/logo.jpeg", width: 800, height: 800, alt: "Xense Energy" }],
+    siteName: "Xense Energy",
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Xense Energy — Intelligent Load Control",
+    description: "Real-time monitoring and AI-powered load control for your energy system",
+    images: ["/logo.jpeg"],
+  },
 };
 
 export default function RootLayout({

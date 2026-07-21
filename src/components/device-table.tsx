@@ -1,8 +1,6 @@
 "use client";
 
 import type { Device } from "@/lib/types";
-import { setRelay } from "@/lib/api-service";
-import { useState } from "react";
 
 interface DeviceTableProps {
   devices: Device[];
@@ -55,9 +53,6 @@ export default function DeviceTable({ devices }: DeviceTableProps) {
 }
 
 function DeviceRow({ device }: { device: Device }) {
-  const [relayOn, setRelayOn] = useState(device.relay_on);
-  const [loading, setLoading] = useState(false);
-
   const statusColor = device.online ? "#34d399" : "#f87171";
 
   const modeColors: Record<string, string> = {
@@ -72,18 +67,6 @@ function DeviceRow({ device }: { device: Device }) {
   };
 
   const iconName = applianceIcons[device.appliance] || "plug";
-
-  const handleToggle = async () => {
-    setLoading(true);
-    try {
-      await setRelay(device.id, relayOn ? "off" : "on");
-      setRelayOn(!relayOn);
-    } catch (err) {
-      console.error("Failed to toggle relay:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <tr className="transition-colors hover:bg-[#1a202c]">
@@ -132,19 +115,17 @@ function DeviceRow({ device }: { device: Device }) {
         {device.power > 0 ? `${device.power.toLocaleString()} W` : "—"}
       </td>
       <td className="px-3 py-3 border-b border-[#1e293b]">
-        <button
-          onClick={handleToggle}
-          disabled={loading}
-          className={`relative w-[40px] h-[22px] rounded-full transition-colors duration-200 ${
-            relayOn ? "bg-[#2dd4bf]" : "bg-[#1e293b]"
-          } ${loading ? "opacity-50 cursor-wait" : "cursor-pointer"}`}
-        >
+        {/* v1: read-only — relay control coming in v2 */}
+        <div className="flex items-center gap-1.5">
           <span
-            className={`absolute top-[3px] left-[3px] w-[16px] h-[16px] rounded-full bg-white transition-all duration-200 ${
-              relayOn ? "left-[21px]" : "left-[3px]"
+            className={`w-2.5 h-2.5 rounded-full inline-block ${
+              device.relay_on ? "bg-[#2dd4bf]" : "bg-[#1e293b]"
             }`}
           />
-        </button>
+          <span className="text-[10px] text-[#5a6d8a]">
+            {device.relay_on ? "ON" : "OFF"}
+          </span>
+        </div>
       </td>
     </tr>
   );

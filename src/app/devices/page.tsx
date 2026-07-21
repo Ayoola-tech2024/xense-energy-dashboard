@@ -41,7 +41,7 @@ export default function DevicesPage() {
         <Header
           onMenuClick={() => setSidebarOpen(!sidebarOpen)}
           title="Devices"
-          subtitle="Manage all your Xense Smart Plugs and connected appliances"
+          subtitle="Monitor all your Xense Smart Plugs and connected appliances (v1: read-only)"
         />
         <main className="flex-1 p-5 lg:p-7 space-y-4 page-enter">
           {/* Summary Cards */}

@@ -1,8 +1,9 @@
-// Xense Energy — Hardware Simulation (plain fetch, no SDK dependency)
-// Posts realistic energy readings to InsForge REST API every N seconds.
+// Xense Energy — Hardware Simulation
+// Posts realistic energy readings to InsForge via CLI.
 
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
+import { execSync } from 'child_process'
 
 // ── Load .env.local ──
 const envPath = resolve(process.cwd(), '.env.local')
@@ -17,28 +18,6 @@ for (const line of envRaw.split('\n')) {
   if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'")))
     val = val.slice(1, -1)
   if (!process.env[key]) process.env[key] = val
-}
-
-const BASE = process.env.NEXT_PUBLIC_INSFORGE_URL
-const KEY = process.env.NEXT_PUBLIC_INSFORGE_ANON_KEY
-if (!BASE || !KEY) {
-  console.error('Missing NEXT_PUBLIC_INSFORGE_URL or NEXT_PUBLIC_INSFORGE_ANON_KEY in .env.local')
-  process.exit(1)
-}
-
-// ── REST helpers (InsForge uses /api/database/records/) ──
-const headers = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' }
-
-async function restInsert(table: string, row: Record<string, unknown>) {
-  const res = await fetch(`${BASE}/api/database/records/${table}`, {
-    method: 'POST',
-    headers: { ...headers, Prefer: 'return=minimal' },
-    body: JSON.stringify([row]),
-  })
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`POST ${table} ${res.status}: ${text}`)
-  }
 }
 
 // ── Config ──
@@ -66,6 +45,13 @@ function getHour(): number {
 
 function clamp(v: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, v))
+}
+
+function esc(v: string | number | boolean | null): string {
+  if (v === null || v === undefined) return 'NULL'
+  if (typeof v === 'boolean') return v ? 'true' : 'false'
+  if (typeof v === 'number') return String(v)
+  return `'${String(v).replace(/'/g, "''")}'`
 }
 
 function genReading() {
@@ -145,24 +131,41 @@ function genReading() {
   }
 }
 
-async function tick() {
+function tick() {
   if (!running) return
-  const reading = genReading()
+  const r = genReading()
+
+  const vals = [
+    esc(r.device_id), esc(r.pv_voltage), esc(r.pv_current), esc(r.pv_power),
+    esc(r.battery_percent), esc(r.battery_voltage), esc(r.battery_temperature),
+    esc(r.battery_charging), esc(r.battery_discharging),
+    esc(r.load_power), esc(r.grid_power), esc(r.grid_status),
+    esc(r.frequency), esc(r.ac_voltage),
+    esc(r.today_production), esc(r.today_consumption),
+    esc(r.relay_state), esc(r.mode), esc(r.device_online),
+    esc(r.wifi_strength), esc(r.firmware_version), esc(r.inverter_temperature),
+    esc(r.timestamp),
+  ].join(', ')
+
+  const sql = `INSERT INTO energy_readings (device_id, pv_voltage, pv_current, pv_power, battery_percent, battery_voltage, battery_temperature, battery_charging, battery_discharging, load_power, grid_power, grid_status, frequency, ac_voltage, today_production, today_consumption, relay_state, mode, device_online, wifi_strength, firmware_version, inverter_temperature, timestamp) VALUES (${vals})`
 
   try {
-    await restInsert('energy_readings', reading)
-  } catch (e) {
-    console.error('[INSERT ERROR]', e)
+    execSync(`npx @insforge/cli db query "${sql.replace(/"/g, '\\"')}" --json`, {
+      stdio: 'pipe',
+      timeout: 10000,
+    })
+  } catch (e: any) {
+    console.error('[INSERT ERROR]', e.stderr?.toString()?.slice(0, 200) || e.message?.slice(0, 200))
     return
   }
 
   tickCount++
   const hour = getHour()
   const timeStr = `${String(Math.floor(hour)).padStart(2, '0')}:${String(Math.floor((hour % 1) * 60)).padStart(2, '0')}`
-  const gridStr = reading.grid_power >= 0
-    ? `⬇ ${reading.grid_power.toFixed(0)}W grid`
-    : `⬆ ${(-reading.grid_power).toFixed(0)}W export`
-  console.log(`[${timeStr}]  solar ${reading.pv_power.toFixed(0)}W | batt ${reading.battery_percent}% | load ${reading.load_power.toFixed(0)}W | ${gridStr} | ${prodToday.toFixed(2)}kWh today`)
+  const gridStr = r.grid_power >= 0
+    ? `⬇ ${r.grid_power.toFixed(0)}W grid`
+    : `⬆ ${(-r.grid_power).toFixed(0)}W export`
+  console.log(`[${timeStr}]  solar ${r.pv_power.toFixed(0)}W | batt ${r.battery_percent}% | load ${r.load_power.toFixed(0)}W | ${gridStr} | ${prodToday.toFixed(2)}kWh today`)
 }
 
 console.log('Xense Energy — Hardware Simulation')

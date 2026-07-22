@@ -7,6 +7,7 @@
 
 ## Complete Data Flow
 
+### Read Path (ESP32 → Dashboard)
 ```
 ┌─────────────┐      ┌──────────────┐      ┌─────────────┐      ┌──────────────┐      ┌─────────────┐
 │   ESP32     │ ───▶ │  HiveMQ      │ ───▶ │  Bridge     │ ───▶ │  Database    │ ───▶ │  Dashboard  │
@@ -14,6 +15,17 @@
 └─────────────┘      └──────────────┘      └─────────────┘      └──────────────┘      └─────────────┘
     Every 5s              Receives             Saves to DB         Stores data          Shows live data
     publishes JSON        your message         your message        forever              + charts
+```
+
+### Write Path (Dashboard → ESP32) — v2 NEW
+```
+┌─────────────┐      ┌──────────────┐      ┌─────────────┐      ┌──────────────┐      ┌─────────────┐
+│  Dashboard  │ ───▶ │  Database    │ ───▶ │  Bridge     │ ───▶ │  HiveMQ      │ ───▶ │   ESP32     │
+│  (Vercel)   │ POST │  (InsForge)  │ SQL  │  (Render)   │ MQTT │  (cloud)     │ MQTT │  (you)      │
+└─────────────┘      └──────────────┘      └─────────────┘      └──────────────┘      └─────────────┘
+   User clicks         Inserts command     Polls every 2s       Publishes to           Receives command
+   a button            into commands       for pending           commands topic         and acts on it
+                       table               commands
 ```
 
 ### Step-by-Step Flow
@@ -98,6 +110,8 @@
 |-------|-----------|-----|-------------|
 | `xense/esp32-xs-001/telemetry` | ESP32 → Broker | 1 | Main sensor data (publish every 5s) |
 | `xense/esp32-xs-001/status` | ESP32 → Broker | 1 | Online/offline status |
+| `xense/esp32-xs-001/commands` | Dashboard → ESP32 | 1 | Commands from dashboard (v2 NEW) |
+| `xense/esp32-xs-001/ack` | ESP32 → Broker | 0 | Command acknowledgment (optional, v2) |
 
 **Topic naming:** `xense/{device_id}/telemetry` — replace `esp32-xs-001` with your device ID.
 
@@ -332,15 +346,95 @@ Once your ESP32 starts publishing, the dashboard automatically shows:
 
 ---
 
-## v1 Limitations
+## v2: Command Topics (Two-Way Communication)
 
-In this version, the ESP32 is **read-only** from the dashboard perspective:
-- The dashboard can VIEW all sensor data
-- The dashboard CANNOT change mode (xense/bypass/auto) remotely
-- The dashboard CANNOT toggle relay ON/OFF remotely
-- The dashboard CANNOT send commands to the ESP32
+The dashboard can now send commands to the ESP32. The bridge publishes commands to `xense/{device_id}/commands`.
 
-These features will be added in a future version via MQTT command topics.
+### Command Payload: Set Mode
+
+When the user clicks a mode button on the dashboard:
+
+```json
+{
+  "type": "set_mode",
+  "mode": "xense"
+}
+```
+
+**Valid modes:** `"xense"`, `"bypass"`, `"auto"`
+
+### Command Payload: Set Relay
+
+When the user toggles the relay on/off:
+
+```json
+{
+  "type": "set_relay",
+  "state": "closed"
+}
+```
+
+**Valid states:** `"closed"` = power ON, `"open"` = power OFF
+
+### ESP32 Arduino Example — Subscribe to Commands
+
+Add this to your existing code to receive commands from the dashboard:
+
+```cpp
+// ── Add this variable ──
+String commandTopic = "xense/" + String(deviceId) + "/commands";
+
+// ── Add callback function ──
+void commandCallback(char* topic, byte* payload, unsigned int length) {
+  String message;
+  for (unsigned int i = 0; i < length; i++) {
+    message += (char)payload[i];
+  }
+  
+  Serial.println("Command received: " + message);
+  
+  // Parse JSON (simple string matching)
+  if (message.indexOf("\"type\":\"set_mode\"") >= 0) {
+    if (message.indexOf("\"mode\":\"xense\"") >= 0) {
+      // TODO: Switch to Xense mode
+      Serial.println("Mode -> Xense");
+    } else if (message.indexOf("\"mode\":\"bypass\"") >= 0) {
+      // TODO: Switch to Bypass mode
+      Serial.println("Mode -> Bypass");
+    } else if (message.indexOf("\"mode\":\"auto\"") >= 0) {
+      // TODO: Switch to Auto mode
+      Serial.println("Mode -> Auto");
+    }
+  } else if (message.indexOf("\"type\":\"set_relay\"") >= 0) {
+    if (message.indexOf("\"state\":\"closed\"") >= 0) {
+      // TODO: Turn relay ON
+      Serial.println("Relay -> ON");
+    } else if (message.indexOf("\"state\":\"open\"") >= 0) {
+      // TODO: Turn relay OFF
+      Serial.println("Relay -> OFF");
+    }
+  }
+  
+  // Optional: Publish acknowledgment
+  String ackTopic = "xense/" + String(deviceId) + "/ack";
+  mqtt.publish(ackTopic.c_str(), "{\"status\":\"ok\"}");
+}
+
+// ── In setup(), after mqtt.connect() ──
+mqtt.setBufferSize(512);  // Increase buffer for incoming commands
+mqtt.subscribe(commandTopic.c_str(), 1);  // QoS 1
+mqtt.setCallback(commandCallback);
+```
+
+### Bridge Command Flow
+
+1. User clicks a button on the dashboard
+2. Dashboard inserts a row into `commands` table with `status = 'pending'`
+3. Bridge polls `commands` table every 2 seconds
+4. Bridge publishes command to `xense/{device_id}/commands` via MQTT
+5. Bridge marks command as `delivered`
+6. ESP32 receives the command and acts on it
+7. (Optional) ESP32 publishes acknowledgment to `xense/{device_id}/ack`
 
 ---
 
@@ -352,8 +446,10 @@ These features will be added in a future version via MQTT command topics.
 | **Port** | 8883 (TLS) |
 | **Publish topic** | `xense/{device_id}/telemetry` |
 | **Status topic** | `xense/{device_id}/status` |
+| **Command topic** | `xense/{device_id}/commands` (v2 NEW) |
+| **Ack topic** | `xense/{device_id}/ack` (optional, v2) |
 | **QoS** | 1 (at least once) |
-| **Interval** | Every 5 seconds |
+| **Interval** | Every 5 seconds (telemetry) |
 | **Payload** | JSON (21 fields, all required) |
 | **Retained** | No (latest data via database) |
 | **Dashboard** | `https://xense-energy-dashboard.vercel.app` |

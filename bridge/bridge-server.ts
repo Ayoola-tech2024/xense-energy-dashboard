@@ -42,6 +42,7 @@ if (!DATABASE_URL) {
 
 // ── Stats ──
 let messageCount = 0
+let commandsPublished = 0
 let errorCount = 0
 const startTime = Date.now()
 let mqttConnected = false
@@ -57,6 +58,7 @@ const server = createServer((req, res) => {
       mqtt: mqttConnected ? 'connected' : 'disconnected',
       postgres: pgConnected ? 'connected' : 'disconnected',
       messagesProcessed: messageCount,
+      commandsPublished: commandsPublished,
       errors: errorCount,
       uptimeSeconds: parseInt(uptime),
     }))
@@ -99,6 +101,42 @@ async function insertReading(data: Record<string, unknown>) {
   await pg.query(sql, values)
 }
 
+// ── Command Publisher ──
+// Polls commands table every 2s, publishes pending commands to ESP32 via MQTT
+let mqttClient: mqtt.MqttClient
+
+async function publishCommands() {
+  if (!mqttClient || !mqttConnected) return
+
+  try {
+    const result = await pg.query(
+      "SELECT * FROM commands WHERE status = $1 ORDER BY created_at LIMIT 10",
+      ["pending"]
+    )
+
+    for (const cmd of result.rows) {
+      const topic = `${TOPIC_PREFIX}/${cmd.device_id}/commands`
+      const payload = JSON.stringify({
+        type: cmd.command_type,
+        ...cmd.payload,
+      })
+
+      mqttClient.publish(topic, payload, { qos: 1 })
+
+      await pg.query(
+        "UPDATE commands SET status = 'delivered', delivered_at = NOW() WHERE id = $1",
+        [cmd.id]
+      )
+
+      commandsPublished++
+      console.log(`[${new Date().toLocaleTimeString()}] 📤 CMD: ${topic} -> ${payload}`)
+    }
+  } catch (err: any) {
+    errorCount++
+    console.error('❌ Command publish error:', err.message?.slice(0, 100))
+  }
+}
+
 // ── Start ──
 async function main() {
   // Connect PostgreSQL
@@ -116,7 +154,7 @@ async function main() {
   if (MQTT_USER) mqttOptions.username = MQTT_USER
   if (MQTT_PASS) mqttOptions.password = MQTT_PASS
 
-  const mqttClient = mqtt.connect(MQTT_BROKER, mqttOptions)
+  mqttClient = mqtt.connect(MQTT_BROKER, mqttOptions)
 
   mqttClient.on('connect', () => {
     mqttConnected = true
@@ -130,6 +168,10 @@ async function main() {
         console.log('🔄 Waiting for ESP32 messages...\n')
       }
     })
+
+    // Poll for pending commands every 2 seconds
+    setInterval(publishCommands, 2000)
+    console.log('📤 Command publisher active (polling every 2s)')
   })
 
   mqttClient.on('message', async (topic, payload) => {

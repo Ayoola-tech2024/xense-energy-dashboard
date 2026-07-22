@@ -245,16 +245,28 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   return { live, devices, chartData, totals, decisions, rules, notifications, priorities };
 }
 
-// ─── RPC Actions ───
+// ─── Command Actions (two-way communication) ───
 
 export async function setMode(deviceId: string, mode: Mode): Promise<void> {
-  const { error } = await insforge.database.rpc("set_device_mode", {
-    p_device_id: deviceId,
-    p_mode: mode,
+  // 1. Insert command into commands table (bridge will publish to ESP32)
+  const { error: cmdError } = await insforge.database.from("commands").insert({
+    device_id: deviceId,
+    command_type: "set_mode",
+    payload: { mode },
+    status: "pending",
   });
-  if (error) {
-    console.error("[API] setMode failed:", error);
-    throw new Error(error.message);
+  if (cmdError) {
+    console.error("[API] setMode command insert failed:", cmdError);
+    throw new Error(cmdError.message);
+  }
+
+  // 2. Optimistic update so dashboard shows new mode instantly
+  const { error: updateError } = await insforge.database
+    .from("devices")
+    .update({ mode, updated_at: new Date().toISOString() })
+    .eq("id", deviceId);
+  if (updateError) {
+    console.error("[API] setMode device update failed:", updateError);
   }
 }
 
@@ -262,12 +274,26 @@ export async function setRelay(
   deviceId: string,
   state: "on" | "off"
 ): Promise<void> {
-  const { error } = await insforge.database.rpc("set_device_relay", {
-    p_device_id: deviceId,
-    p_state: state === "on" ? "closed" : "open",
+  const dbState = state === "on" ? "closed" : "open";
+
+  // 1. Insert command into commands table (bridge will publish to ESP32)
+  const { error: cmdError } = await insforge.database.from("commands").insert({
+    device_id: deviceId,
+    command_type: "set_relay",
+    payload: { state: dbState },
+    status: "pending",
   });
-  if (error) {
-    console.error("[API] setRelay failed:", error);
-    throw new Error(error.message);
+  if (cmdError) {
+    console.error("[API] setRelay command insert failed:", cmdError);
+    throw new Error(cmdError.message);
+  }
+
+  // 2. Optimistic update so dashboard shows new relay state instantly
+  const { error: updateError } = await insforge.database
+    .from("devices")
+    .update({ relay_on: state === "on", updated_at: new Date().toISOString() })
+    .eq("id", deviceId);
+  if (updateError) {
+    console.error("[API] setRelay device update failed:", updateError);
   }
 }

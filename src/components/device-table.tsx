@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { setRelay } from "@/lib/api-service";
 import type { Device } from "@/lib/types";
 
 interface DeviceTableProps {
@@ -67,6 +69,18 @@ function DeviceRow({ device }: { device: Device }) {
   };
 
   const iconName = applianceIcons[device.appliance] || "plug";
+  const [relayLoading, setRelayLoading] = useState(false);
+
+  const handleRelayToggle = async () => {
+    setRelayLoading(true);
+    try {
+      await setRelay(device.id, device.relay_on ? "off" : "on");
+    } catch (err) {
+      console.error("Failed to toggle relay:", err);
+    } finally {
+      setRelayLoading(false);
+    }
+  };
 
   return (
     <tr className="transition-colors hover:bg-[#1a202c]">
@@ -115,17 +129,26 @@ function DeviceRow({ device }: { device: Device }) {
         {device.power > 0 ? `${device.power.toLocaleString()} W` : "—"}
       </td>
       <td className="px-3 py-3 border-b border-[#1e293b]">
-        {/* v1: read-only — relay control coming in v2 */}
-        <div className="flex items-center gap-1.5">
-          <span
-            className={`w-2.5 h-2.5 rounded-full inline-block ${
-              device.relay_on ? "bg-[#2dd4bf]" : "bg-[#1e293b]"
-            }`}
-          />
-          <span className="text-[10px] text-[#5a6d8a]">
-            {device.relay_on ? "ON" : "OFF"}
-          </span>
-        </div>
+        <button
+          onClick={handleRelayToggle}
+          disabled={relayLoading}
+          className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-semibold transition-all cursor-pointer disabled:opacity-50 ${
+            device.relay_on
+              ? "bg-[rgba(45,212,191,0.15)] text-[#2dd4bf] hover:bg-[rgba(45,212,191,0.25)]"
+              : "bg-[#1e293b] text-[#5a6d8a] hover:bg-[#2a3444]"
+          }`}
+        >
+          {relayLoading ? (
+            <i className="fas fa-spinner fa-spin" />
+          ) : (
+            <span
+              className={`w-2 h-2 rounded-full inline-block ${
+                device.relay_on ? "bg-[#2dd4bf]" : "bg-[#5a6d8a]"
+              }`}
+            />
+          )}
+          {relayLoading ? "..." : device.relay_on ? "ON" : "OFF"}
+        </button>
       </td>
     </tr>
   );

@@ -24,7 +24,7 @@ for (const line of envRaw.split('\n')) {
 // ── Config ──
 const intervalMs = parseInt(process.argv.find(a => a.startsWith('--interval='))?.split('=')[1] ?? '3000', 10)
 const DEVICE_ID = 'esp32-xs-001'
-const CYCLE_MS = 8 * 60 * 1000
+const CYCLE_MS = parseInt(process.argv.find(a => a.startsWith('--cycle='))?.split('=')[1] ?? '60000', 10) // full day in 60s by default
 
 const MQTT_BROKER = process.env.MQTT_BROKER_URL || 'mqtts://localhost:8883'
 const MQTT_USER = process.env.MQTT_USERNAME || ''
@@ -63,55 +63,73 @@ function clamp(v: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, v))
 }
 
+// per-reading jitter so every value dances
+let tickJitter = 0
+
 function genReading() {
   const hour = getHour()
   const n = () => (Math.random() - 0.5) * 2
+  tickJitter = Math.random()
 
+  // ── Solar: smooth bell curve + cloud flicker ──
   let solarPower = 0
   if (hour >= 6 && hour <= 18) {
     solarPower = Math.sin(Math.PI * (hour - 6) / 12) * 1200
-    if (Math.random() < 0.15) solarPower *= (0.5 + Math.random() * 0.4)
+    const cloud = Math.random() < 0.12 ? 0.3 + Math.random() * 0.5 : 0.85 + Math.random() * 0.15
+    solarPower *= cloud
   }
-  solarPower = Math.max(0, solarPower + n() * 50)
+  solarPower = Math.max(0, solarPower + n() * 80)
 
+  // ── Load: time-of-day profile + jitter ──
   let loadPower = 200
   if (hour >= 7 && hour <= 9) loadPower = 450
   else if (hour >= 17 && hour <= 21) loadPower = 500
   else if (hour >= 22 || hour <= 5) loadPower = 120
   else loadPower = 250
-  loadPower = Math.max(50, loadPower + n() * 60)
+  loadPower = Math.max(50, loadPower + n() * 80)
 
-  const gridAvail = Math.random() > 0.02
+  // ── Grid ──
+  const gridAvail = Math.random() > 0.03
+
+  // ── Battery: faster charge/discharge for visible movement ──
   const surplus = solarPower - loadPower
-
   let batteryPower = 0
   if (surplus > 0) {
-    batteryPower = surplus * 0.7
-    batterySoc += (batteryPower / 5000) * 100
+    batteryPower = surplus * 0.6
+    batterySoc += (batteryPower / 2000) * 100
   } else {
-    batteryPower = surplus * 0.4
-    batterySoc += (batteryPower / 5000) * 100
+    batteryPower = surplus * 0.3
+    batterySoc += (batteryPower / 2000) * 100
   }
-  batterySoc = clamp(batterySoc, 20, 95)
+  batterySoc = clamp(batterySoc, 15, 98)
 
   let gridPower = 0
   if (gridAvail) {
     if (surplus > 0) {
-      gridPower = -(surplus - (surplus * 0.7)) * 0.5
+      gridPower = -(surplus - (surplus * 0.6)) * 0.5
     } else {
       gridPower = -surplus * 0.5
     }
   }
 
-  const pvVoltage = 48 + n() * 4
+  // ── Voltages / temps / freqs: every value changes every tick ──
+  const pvVoltage = solarPower > 10 ? 48 + n() * 6 : n() * 2
   const pvCurrent = pvVoltage > 0.1 ? solarPower / pvVoltage : 0
-  const battVoltage = 51 + n() * 2
-  const battTemp = 25 + n() * 5 + (batterySoc > 80 ? 5 : 0)
+  const battVoltage = 51 + Math.sin(tickJitter * Math.PI * 2) * 1.5 + n() * 0.5
+  const battTemp = 25 + Math.sin(tickJitter * Math.PI * 2 + 1) * 3 + (batterySoc > 80 ? 4 : 0) + n() * 1
+  const inverterTemp = 38 + Math.sin(tickJitter * Math.PI * 2 + 2) * 4 + n() * 2
+  const freq = 50 + Math.sin(tickJitter * Math.PI * 4) * 0.15 + n() * 0.05
+  const acV = 230 + Math.sin(tickJitter * Math.PI * 3) * 2 + n() * 1
+  const wifi = Math.round(-60 + Math.sin(tickJitter * Math.PI * 2) * 8 + n() * 4)
   const battCharging = batteryPower > 0
   const battDischarging = batteryPower < 0
 
   prodToday += solarPower * (intervalMs / 3600000)
   consToday += loadPower * (intervalMs / 3600000)
+
+  // Alternate relay/mode slightly for variety
+  const relayState = tickJitter > 0.92 ? 'open' : 'closed'
+  const currentMode = tickJitter > 0.95 ? 'bypass' : tickJitter > 0.90 ? 'xense' : 'auto'
 
   return {
     device_id: DEVICE_ID,
@@ -126,16 +144,16 @@ function genReading() {
     load_power: +loadPower.toFixed(1),
     grid_power: +gridPower.toFixed(1),
     grid_status: gridAvail ? 'available' : 'unavailable',
-    frequency: +(50 + n() * 0.2).toFixed(1),
-    ac_voltage: +(230 + n() * 3).toFixed(1),
+    frequency: +freq.toFixed(2),
+    ac_voltage: +acV.toFixed(1),
     today_production: +prodToday.toFixed(3),
     today_consumption: +consToday.toFixed(3),
-    relay_state: 'closed',
-    mode: 'auto',
+    relay_state: relayState,
+    mode: currentMode,
     device_online: 'online',
-    wifi_strength: Math.round(-55 + n() * 10),
+    wifi_strength: wifi,
     firmware_version: '2.1.0',
-    inverter_temperature: Math.round(35 + n() * 8),
+    inverter_temperature: Math.round(inverterTemp),
     timestamp: new Date().toISOString(),
   }
 }
@@ -154,11 +172,12 @@ function tick() {
   const gridStr = r.grid_power >= 0
     ? `⬇ ${r.grid_power.toFixed(0)}W grid`
     : `⬆ ${(-r.grid_power).toFixed(0)}W export`
-  console.log(`[${timeStr}]  solar ${r.pv_power.toFixed(0)}W | batt ${r.battery_percent}% | load ${r.load_power.toFixed(0)}W | ${gridStr} | ${prodToday.toFixed(2)}kWh today`)
+  console.log(`[${timeStr}]  ☀${r.pv_power.toFixed(0)}W  🔋${r.battery_percent}%(${r.battery_voltage}V)  ⚡${r.load_power.toFixed(0)}W  ${gridStr}  🌡️${r.battery_temperature}°C/${r.inverter_temperature}°C  📡${r.wifi_strength}dBm  ${r.mode}  ${r.frequency}Hz`)
 }
 
 console.log('Xense Energy — Hardware Simulation (MQTT)')
-console.log(`Device: ${DEVICE_ID} | Broker: ${MQTT_BROKER} | Interval: ${intervalMs}ms`)
+console.log(`Device: ${DEVICE_ID} | Broker: ${MQTT_BROKER} | Interval: ${intervalMs}ms | Cycle: ${CYCLE_MS}ms (1 day = ${(CYCLE_MS / 1000).toFixed(0)}s)`)
+console.log(`Usage: npx tsx scripts/simulate.ts --interval 3000 --cycle 60000`)
 
 mqttClient.on('connect', () => {
   console.log('✅ Connected to MQTT broker — publishing simulated data...\n')

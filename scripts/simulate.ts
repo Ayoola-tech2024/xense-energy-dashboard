@@ -1,9 +1,10 @@
 // Xense Energy — Hardware Simulation
-// Posts realistic energy readings to InsForge via CLI.
+// Publishes realistic energy readings to MQTT broker.
+// Bridge service picks them up and writes to Postgres.
 
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
-import { execSync } from 'child_process'
+import mqtt from 'mqtt'
 
 // ── Load .env.local ──
 const envPath = resolve(process.cwd(), '.env.local')
@@ -25,6 +26,10 @@ const intervalMs = parseInt(process.argv.find(a => a.startsWith('--interval='))?
 const DEVICE_ID = 'esp32-xs-001'
 const CYCLE_MS = 8 * 60 * 1000
 
+const MQTT_BROKER = process.env.MQTT_BROKER_URL || 'mqtts://localhost:8883'
+const MQTT_USER = process.env.MQTT_USERNAME || ''
+const MQTT_PASS = process.env.MQTT_PASSWORD || ''
+
 let running = true
 let tickCount = 0
 let prodToday = 0
@@ -32,10 +37,21 @@ let consToday = 0
 let startTime = Date.now()
 let batterySoc = 50
 
+// ── MQTT Client ──
+const mqttClient = mqtt.connect(MQTT_BROKER, {
+  clientId: `sim-${DEVICE_ID}-${Math.random().toString(16).slice(2, 6)}`,
+  username: MQTT_USER || undefined,
+  password: MQTT_PASS || undefined,
+  clean: true,
+  reconnectPeriod: 5000,
+  connectTimeout: 10000,
+})
+
 process.on('SIGINT', () => {
   running = false
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(0)
   console.log(`\nStopped. ${tickCount} readings in ${elapsed}s. Produced: ${prodToday.toFixed(2)}kWh`)
+  mqttClient.end()
   process.exit(0)
 })
 
@@ -45,13 +61,6 @@ function getHour(): number {
 
 function clamp(v: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, v))
-}
-
-function esc(v: string | number | boolean | null): string {
-  if (v === null || v === undefined) return 'NULL'
-  if (typeof v === 'boolean') return v ? 'true' : 'false'
-  if (typeof v === 'number') return String(v)
-  return `'${String(v).replace(/'/g, "''")}'`
 }
 
 function genReading() {
@@ -135,29 +144,9 @@ function tick() {
   if (!running) return
   const r = genReading()
 
-  const vals = [
-    esc(r.device_id), esc(r.pv_voltage), esc(r.pv_current), esc(r.pv_power),
-    esc(r.battery_percent), esc(r.battery_voltage), esc(r.battery_temperature),
-    esc(r.battery_charging), esc(r.battery_discharging),
-    esc(r.load_power), esc(r.grid_power), esc(r.grid_status),
-    esc(r.frequency), esc(r.ac_voltage),
-    esc(r.today_production), esc(r.today_consumption),
-    esc(r.relay_state), esc(r.mode), esc(r.device_online),
-    esc(r.wifi_strength), esc(r.firmware_version), esc(r.inverter_temperature),
-    esc(r.timestamp),
-  ].join(', ')
-
-  const sql = `INSERT INTO energy_readings (device_id, pv_voltage, pv_current, pv_power, battery_percent, battery_voltage, battery_temperature, battery_charging, battery_discharging, load_power, grid_power, grid_status, frequency, ac_voltage, today_production, today_consumption, relay_state, mode, device_online, wifi_strength, firmware_version, inverter_temperature, timestamp) VALUES (${vals})`
-
-  try {
-    execSync(`npx @insforge/cli db query "${sql.replace(/"/g, '\\"')}" --json`, {
-      stdio: 'pipe',
-      timeout: 10000,
-    })
-  } catch (e: any) {
-    console.error('[INSERT ERROR]', e.stderr?.toString()?.slice(0, 200) || e.message?.slice(0, 200))
-    return
-  }
+  const topic = `xense/${DEVICE_ID}/telemetry`
+  const payload = JSON.stringify(r)
+  mqttClient.publish(topic, payload, { qos: 1 })
 
   tickCount++
   const hour = getHour()
@@ -168,7 +157,16 @@ function tick() {
   console.log(`[${timeStr}]  solar ${r.pv_power.toFixed(0)}W | batt ${r.battery_percent}% | load ${r.load_power.toFixed(0)}W | ${gridStr} | ${prodToday.toFixed(2)}kWh today`)
 }
 
-console.log('Xense Energy — Hardware Simulation')
-console.log(`Device: ${DEVICE_ID} | Interval: ${intervalMs}ms | Sim day: ${(CYCLE_MS / 1000).toFixed(0)}s\n`)
-setInterval(tick, intervalMs)
-tick()
+console.log('Xense Energy — Hardware Simulation (MQTT)')
+console.log(`Device: ${DEVICE_ID} | Broker: ${MQTT_BROKER} | Interval: ${intervalMs}ms`)
+
+mqttClient.on('connect', () => {
+  console.log('✅ Connected to MQTT broker — publishing simulated data...\n')
+  tick()
+  setInterval(tick, intervalMs)
+})
+
+mqttClient.on('error', (err) => {
+  console.error('❌ MQTT error:', err.message)
+  process.exit(1)
+})

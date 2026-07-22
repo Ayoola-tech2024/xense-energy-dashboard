@@ -1,7 +1,79 @@
 # Xense Energy — API Contract (MQTT)
 
-> **For Hardware Engineer (ESP32)**
-> This document defines the exact JSON format your ESP32 must publish via MQTT, and the topic structure. You do NOT need to store data, handle HTTP, or manage a database — just publish JSON every 5 seconds.
+> **For Hardware Engineer (ESP32) + Dashboard Team**
+> This document defines the exact JSON format the ESP32 must publish via MQTT, the topic structure, and how data flows from hardware to dashboard.
+
+---
+
+## Complete Data Flow
+
+```
+┌─────────────┐      ┌──────────────┐      ┌─────────────┐      ┌──────────────┐      ┌─────────────┐
+│   ESP32     │ ───▶ │  HiveMQ      │ ───▶ │  Bridge     │ ───▶ │  Database    │ ───▶ │  Dashboard  │
+│  (you)      │ MQTT │  (cloud)     │ MQTT │  (Render)   │ SQL  │  (InsForge)  │ GET  │  (Vercel)   │
+└─────────────┘      └──────────────┘      └─────────────┘      └──────────────┘      └─────────────┘
+    Every 5s              Receives             Saves to DB         Stores data          Shows live data
+    publishes JSON        your message         your message        forever              + charts
+```
+
+### Step-by-Step Flow
+
+**Step 1: ESP32 reads sensors**
+- Your ESP32 reads: battery %, solar voltage/current/power, load power, grid status, temperature, etc.
+- You build a JSON object with all 21 fields
+
+**Step 2: ESP32 publishes to MQTT**
+- ESP32 connects to HiveMQ broker (`a480ae87e6974650ba20764b3db2d7a9.s1.eu.hivemq.cloud:8883`)
+- Every 5 seconds, publishes JSON to topic `xense/esp32-xs-001/telemetry`
+- Example message:
+```json
+{
+  "device_id": "esp32-xs-001",
+  "battery_percent": 72,
+  "pv_power": 1847,
+  "load_power": 652,
+  "grid_status": "available",
+  ...
+}
+```
+
+**Step 3: HiveMQ receives the message**
+- HiveMQ is a cloud message broker (like a post office)
+- It receives your JSON and holds it until someone picks it up
+- You don't need to do anything here — it just works
+
+**Step 4: Bridge picks up the message**
+- Our bridge service (`https://xense-mqtt-bridge.onrender.com`) runs 24/7
+- It subscribes to `xense/+/telemetry` (any device)
+- When your message arrives, it reads the JSON
+
+**Step 5: Bridge saves to database**
+- Bridge takes your JSON and inserts it into the `energy_readings` table in PostgreSQL
+- Every reading is stored with a timestamp
+- The database keeps the last 7 days of data (auto-deletes older data)
+
+**Step 6: Dashboard reads from database**
+- Dashboard (`https://xense-energy-dashboard.vercel.app`) queries the database every 5 seconds
+- It asks: "Give me the latest reading for device esp32-xs-001"
+- Database returns your JSON
+
+**Step 7: Dashboard displays the data**
+- Live numbers update (battery %, solar power, load, etc.)
+- Charts show last 24 hours of production vs consumption
+- Device list shows online/offline status
+- Energy totals show today's production and savings
+
+---
+
+## What Each Service Does
+
+| Service | URL | What It Does | Who Runs It |
+|---------|-----|-------------|-------------|
+| **ESP32** | — | Reads sensors, publishes JSON every 5s | Hardware engineer |
+| **HiveMQ** | `a480ae87e6974650ba20764b3db2d7a9.s1.eu.hivemq.cloud` | Cloud mailbox — receives and holds messages | HiveMQ Cloud (free) |
+| **Bridge** | `https://xense-mqtt-bridge.onrender.com` | Picks up messages, saves to database | You (auto-deploys) |
+| **Database** | InsForge PostgreSQL | Stores all readings (7 days history) | InsForge (auto) |
+| **Dashboard** | `https://xense-energy-dashboard.vercel.app` | Shows live data, charts, device list | You (auto-deploys) |
 
 ---
 
@@ -16,7 +88,7 @@
 | **Password** | `Xense2026` |
 | **Client ID** | `esp32-xs-001` |
 
-> The dashboard team has provided the connection details above. Use these exact values in your ESP32 code.
+> Use these exact values in your ESP32 code.
 
 ---
 
@@ -247,30 +319,16 @@ void publishTelemetry() {
 
 ---
 
-## What Happens Behind the Scenes
+## What the Dashboard Shows
 
-```
-ESP32 ──MQTT──▶ HiveMQ Broker ──▶ Bridge Service ──▶ Database ──▶ Dashboard
- (you)           (cloud)           (we build this)    (Postgres)    (web app)
-```
+Once your ESP32 starts publishing, the dashboard automatically shows:
 
-1. Your ESP32 publishes JSON to the MQTT broker
-2. A bridge service (we build this) receives the message
-3. Bridge writes it to the database
-4. Dashboard reads from the database and shows live data
-
-**You do NOT need to:** store data, handle HTTP, manage a database, or deal with auth tokens.
-
----
-
-## Data History
-
-All readings are stored server-side. The dashboard can show:
-- Live data (last reading)
-- Charts (last 24 hours)
-- Historical analytics (last 7 days)
-
-Your ESP32 only sends the current reading — we handle the rest.
+| Dashboard Page | What It Shows |
+|---------------|---------------|
+| **Overview** | Live battery %, solar power, load power, grid status, today's production |
+| **Analytics** | Charts of production vs consumption over last 24 hours |
+| **Devices** | List of all smart plugs with online/offline status, current mode |
+| **Energy Totals** | Today's total production, consumption, savings, CO2 avoided |
 
 ---
 
@@ -298,3 +356,5 @@ These features will be added in a future version via MQTT command topics.
 | **Interval** | Every 5 seconds |
 | **Payload** | JSON (21 fields, all required) |
 | **Retained** | No (latest data via database) |
+| **Dashboard** | `https://xense-energy-dashboard.vercel.app` |
+| **Bridge** | `https://xense-mqtt-bridge.onrender.com` |
